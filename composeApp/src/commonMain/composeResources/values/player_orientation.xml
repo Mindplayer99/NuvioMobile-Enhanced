@@ -1,0 +1,12 @@
+<resources>
+    <string name="compose_player_rotate_screen">Rotate screen</string>
+    <string name="settings_player_orientation">Player orientation</string>
+    <string name="settings_player_orientation_remember">Remember last used</string>
+    <string name="settings_player_orientation_landscape">Always Landscape</string>
+    <string name="settings_player_orientation_portrait">Always Portrait</string>
+    <string name="settings_player_orientation_device">Follow Device</string>
+    <string name="settings_player_orientation_remember_description">Remember the rotate button choice for later videos. Starts in Landscape.</string>
+    <string name="settings_player_orientation_landscape_description">Start each video in Landscape. The rotate button changes only the current video.</string>
+    <string name="settings_player_orientation_portrait_description">Start each video in Portrait. The rotate button changes only the current video.</string>
+    <string name="settings_player_orientation_device_description">Follow system auto-rotate. The rotate button overrides it for the current video.</string>
+</resources>

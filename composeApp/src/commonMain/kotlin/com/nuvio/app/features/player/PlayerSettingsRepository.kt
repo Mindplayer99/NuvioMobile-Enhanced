@@ -34,6 +34,8 @@ fun snapToAllowedTimeout(value: Int): Int {
 data class PlayerSettingsUiState(
     val showLoadingOverlay: Boolean = true,
     val showParentalGuide: Boolean = true,
+    val orientationPreference: PlayerOrientationPreference = PlayerOrientationPreference.RememberLastUsed,
+    val lastPlayerOrientation: PlayerOrientation = PlayerOrientation.Landscape,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val holdToSpeedEnabled: Boolean = true,
     val holdToSpeedValue: Float = 2f,
@@ -102,6 +104,8 @@ object PlayerSettingsRepository {
     private var hasLoaded = false
     private var showLoadingOverlay = true
     private var showParentalGuide = true
+    private var orientationPreference = PlayerOrientationPreference.RememberLastUsed
+    private var lastPlayerOrientation = PlayerOrientation.Landscape
     private var resizeMode = PlayerResizeMode.Fit
     private var holdToSpeedEnabled = true
     private var holdToSpeedValue = 2f
@@ -175,6 +179,8 @@ object PlayerSettingsRepository {
         hasLoaded = false
         showLoadingOverlay = true
         showParentalGuide = true
+        orientationPreference = PlayerOrientationPreference.RememberLastUsed
+        lastPlayerOrientation = PlayerOrientation.Landscape
         resizeMode = PlayerResizeMode.Fit
         holdToSpeedEnabled = true
         holdToSpeedValue = 2f
@@ -240,6 +246,8 @@ object PlayerSettingsRepository {
         hasLoaded = true
         showLoadingOverlay = PlayerSettingsStorage.loadShowLoadingOverlay() ?: true
         showParentalGuide = PlayerSettingsStorage.loadShowParentalGuide() ?: true
+        orientationPreference = PlayerOrientationPreference.fromStored(PlayerSettingsStorage.loadOrientationPreference())
+        lastPlayerOrientation = PlayerOrientation.fromStored(PlayerSettingsStorage.loadLastPlayerOrientation())
         resizeMode = PlayerSettingsStorage.loadResizeMode()
             ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
             ?: PlayerResizeMode.Fit
@@ -386,6 +394,24 @@ object PlayerSettingsRepository {
         showParentalGuide = enabled
         publish()
         PlayerSettingsStorage.saveShowParentalGuide(enabled)
+    }
+
+    fun setOrientationPreference(preference: PlayerOrientationPreference) {
+        ensureLoaded()
+        if (orientationPreference == preference) return
+        orientationPreference = preference
+        PlayerSettingsStorage.saveOrientationPreference(preference.name)
+        publish()
+    }
+
+    fun rememberPlayerOrientation(orientation: PlayerOrientation) {
+        ensureLoaded()
+        if (orientationPreference != PlayerOrientationPreference.RememberLastUsed ||
+            lastPlayerOrientation == orientation
+        ) return
+        lastPlayerOrientation = orientation
+        PlayerSettingsStorage.saveLastPlayerOrientation(orientation.name)
+        publish()
     }
 
     fun setResizeMode(mode: PlayerResizeMode) {
@@ -935,6 +961,8 @@ object PlayerSettingsRepository {
         _uiState.value = PlayerSettingsUiState(
             showLoadingOverlay = showLoadingOverlay,
             showParentalGuide = showParentalGuide,
+            orientationPreference = orientationPreference,
+            lastPlayerOrientation = lastPlayerOrientation,
             resizeMode = resizeMode,
             holdToSpeedEnabled = holdToSpeedEnabled,
             holdToSpeedValue = holdToSpeedValue,
