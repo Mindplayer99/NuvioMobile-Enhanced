@@ -7,14 +7,14 @@ import kotlin.test.assertEquals
 class HomeHeroSectionTest {
 
     @Test
-    fun `mobile hero height follows viewport height when provided`() {
+    fun `mobile portrait hero height remains width driven`() {
         val layout = homeHeroLayout(
             maxWidthDp = 390f,
             viewportHeightDp = 844f,
         )
 
         assertEquals(false, layout.isTablet)
-        assertEquals(692.08f, layout.heroHeight.value, 0.001f)
+        assertEquals(585f, layout.heroHeight.value, 0.001f)
     }
 
     @Test
@@ -29,8 +29,8 @@ class HomeHeroSectionTest {
     }
 
     @Test
-    fun `mobile hero height leaves room for continue watching card section`() {
-        val viewportHeight = 844f
+    fun `mobile landscape hero height leaves room for continue watching card section`() {
+        val viewportHeight = 360f
         val continueWatchingLayout = rememberContinueWatchingLayout(maxWidthDp = 390f)
         val continueWatchingHeight = continueWatchingSectionHeightEstimate(
             style = ContinueWatchingSectionStyle.Card,
@@ -52,14 +52,14 @@ class HomeHeroSectionTest {
     }
 
     @Test
-    fun `mobile hero can shrink below default minimum to fit short viewport`() {
+    fun `mobile landscape hero can shrink below default minimum to fit short viewport`() {
         val layout = homeHeroLayout(
             maxWidthDp = 390f,
-            viewportHeightDp = 568f,
+            viewportHeightDp = 360f,
             mobileBelowSectionHeightHintDp = 300f,
         )
 
         assertEquals(false, layout.isTablet)
-        assertEquals(268f, layout.heroHeight.value, 0.001f)
+        assertEquals(60f, layout.heroHeight.value, 0.001f)
     }
 }
