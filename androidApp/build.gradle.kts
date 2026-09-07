@@ -74,7 +74,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = releaseAppVersionCode
         versionName = releaseAppVersionName
-        requestedAbis?.let { abis -> ndk { abiFilters += abis } }
+        if (!buildsReleaseApks) requestedAbis?.let { abis -> ndk { abiFilters += abis } }
     }
 
     flavorDimensions += "distribution"
