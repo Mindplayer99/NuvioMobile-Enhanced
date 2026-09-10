@@ -1,0 +1,40 @@
+name: Orientation release preflight
+on:
+  push:
+    branches: [ops/orientation-release-preflight]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: orientation-release-preflight
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      KEYSTORE: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+      PROPERTIES: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+    steps:
+      - name: Preserve exact known-good source tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=fd7577e141b8647a2a26963d5f4157be76cc45bd
+          actual="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/feature/android-player-orientation" --jq .object.sha)"
+          test "$actual" = "$expected"
+          if existing="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/0.4.14-orientation-final" --jq .object.sha 2>/dev/null)"; then
+            test "$existing" = "$expected"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref=refs/tags/0.4.14-orientation-final -f sha="$expected" --silent
+          fi
+          echo "Known-good source tag verified."
+      - name: Check required secure build configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          if [[ -z "$KEYSTORE" ]]; then echo "::error::NUVIO_RELEASE_KEYSTORE_BASE64 is unavailable to Actions"; missing=1; fi
+          if [[ -z "$PROPERTIES" ]]; then echo "::error::NUVIO_LOCAL_PROPERTIES_BASE64 is unavailable to Actions"; missing=1; fi
+          test "$missing" = 0
+          echo "Both signing/build secrets are available; their contents were not printed."
