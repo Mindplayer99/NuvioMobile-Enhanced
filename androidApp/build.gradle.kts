@@ -75,7 +75,7 @@ android {
         versionCode = releaseAppVersionCode
         versionName = releaseAppVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        requestedAbis?.let { abis -> ndk { abiFilters += abis } }
+        if (!buildsReleaseApks) requestedAbis?.let { abis -> ndk { abiFilters += abis } }
     }
 
     flavorDimensions += "distribution"

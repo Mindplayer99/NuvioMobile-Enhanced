@@ -333,8 +333,9 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     onRotateScreen: (() -> Unit)?,
 ) {
     val isInPip = rememberIsInPictureInPicture()
+    val compactTrackModalOpen = metrics.compactControls && (showAudioModal || showSubtitleModal)
     AnimatedVisibility(
-        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
+        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !compactTrackModalOpen,
         enter = fadeIn(),
         exit = fadeOut(),
     ) {
@@ -647,9 +648,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             scope.launch {
                 kotlinx.coroutines.delay(200)
                 showAudioModal = false
+                if (metrics.compactControls) controlsVisible = true
             }
         },
-        onAudioModalDismissed = { showAudioModal = false },
+        onAudioModalDismissed = {
+            showAudioModal = false
+            if (metrics.compactControls) controlsVisible = true
+        },
         showSubtitleModal = showSubtitleModal,
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,
@@ -692,7 +697,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
         onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
         onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
-        onSubtitleModalDismissed = { showSubtitleModal = false },
+        onSubtitleModalDismissed = {
+            showSubtitleModal = false
+            if (metrics.compactControls) controlsVisible = true
+        },
         showVideoSettingsModal = showVideoSettingsModal,
         playerSettings = playerSettingsUiState,
         onVideoSettingsChanged = {

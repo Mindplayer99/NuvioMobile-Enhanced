@@ -302,6 +302,7 @@ internal fun HomeHeroSection(
             val artworkBaseScale = if (isCardStyle) 1f else HERO_BACKGROUND_SCALE
             val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
             val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
+            // Read per-pixel offsets in graphicsLayer, not while composing the hero.
             val scrollOffsetPx by remember(listState, heroHeightPx) {
                 derivedStateOf {
                     when {
@@ -311,8 +312,6 @@ internal fun HomeHeroSection(
                     }
                 }
             }
-            val heroScrollScale = heroBackgroundScrollScale(scrollOffsetPx)
-            val heroScrollTranslationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
             val currentPage = pagerState.currentPage.coerceIn(items.indices)
             val visiblePages = listOf(
                 currentPage,
@@ -454,11 +453,11 @@ internal fun HomeHeroSection(
                                         .graphicsLayer {
                                             alpha = layer.visibility
                                             translationX = -layer.offset * heroWidthPx * artworkParallax
-                                            translationY = if (isCardStyle) 0f else heroScrollTranslationY
+                                            translationY = if (isCardStyle) 0f else heroBackgroundScrollTranslationY(scrollOffsetPx)
                                             scaleX = artworkBaseScale *
-                                                if (isCardStyle) 1f else heroScrollScale
+                                                if (isCardStyle) 1f else heroBackgroundScrollScale(scrollOffsetPx)
                                             scaleY = artworkBaseScale *
-                                                if (isCardStyle) 1f else heroScrollScale
+                                                if (isCardStyle) 1f else heroBackgroundScrollScale(scrollOffsetPx)
                                         },
                                     alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
                                     contentScale = ContentScale.Crop,
@@ -477,7 +476,9 @@ internal fun HomeHeroSection(
                             )
                             val currentPageOffset = pagerState.currentPageOffsetFraction
                             val currentPageVisibility = (1f - abs(currentPageOffset)).coerceIn(0f, 1f)
-                            val isHeroScrolledAway = scrollOffsetPx >= heroHeightPx * 0.6f
+                            val isHeroScrolledAway by remember(listState, heroHeightPx) {
+                                derivedStateOf { scrollOffsetPx >= heroHeightPx * 0.6f }
+                            }
                             HeroTrailerPlayerSurface(
                                 sourceUrl = heroTrailerSourceUrl,
                                 sourceAudioUrl = heroTrailerPlaybackSource?.audioUrl,
@@ -491,9 +492,9 @@ internal fun HomeHeroSection(
                                     .graphicsLayer {
                                         alpha = trailerReadyAlpha * currentPageVisibility
                                         translationX = -currentPageOffset * heroWidthPx * artworkParallax
-                                        translationY = if (isCardStyle) 0f else heroScrollTranslationY
-                                        scaleX = artworkBaseScale * if (isCardStyle) 1f else heroScrollScale
-                                        scaleY = artworkBaseScale * if (isCardStyle) 1f else heroScrollScale
+                                        translationY = if (isCardStyle) 0f else heroBackgroundScrollTranslationY(scrollOffsetPx)
+                                        scaleX = artworkBaseScale * if (isCardStyle) 1f else heroBackgroundScrollScale(scrollOffsetPx)
+                                        scaleY = artworkBaseScale * if (isCardStyle) 1f else heroBackgroundScrollScale(scrollOffsetPx)
                                     },
                                 onReady = {
                                     if (!heroTrailerFinished) heroTrailerReady = true
