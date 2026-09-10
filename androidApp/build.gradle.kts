@@ -46,6 +46,11 @@ val requestedTaskNames = gradle.startParameter.taskNames.map { it.substringAfter
 val buildsReleaseApks = requestedTaskNames.any {
     it.startsWith("assemble", ignoreCase = true) && it.endsWith("Release", ignoreCase = true)
 }
+// Optional, isolated sideload build settings; normal upstream builds keep their defaults.
+val requestedAbis = providers.gradleProperty("nuvio.android.abis").orNull
+    ?.split(',')?.map(String::trim)?.filter(String::isNotEmpty)
+val keepApplicationId = providers.gradleProperty("nuvio.android.keepApplicationId")
+    .map(String::toBoolean).getOrElse(false)
 
 android {
     namespace = "com.nuvio.android"
@@ -70,6 +75,7 @@ android {
         versionCode = releaseAppVersionCode
         versionName = releaseAppVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        requestedAbis?.let { abis -> ndk { abiFilters += abis } }
     }
 
     flavorDimensions += "distribution"
@@ -107,7 +113,7 @@ android {
         abi {
             isEnable = buildsReleaseApks
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include(*(requestedAbis ?: listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")).toTypedArray())
             isUniversalApk = false
         }
     }
@@ -136,7 +142,7 @@ android {
 
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
-        variant.applicationId.set("com.nuviodebug.com")
+        if (!keepApplicationId) variant.applicationId.set("com.nuviodebug.com")
     }
 }
 

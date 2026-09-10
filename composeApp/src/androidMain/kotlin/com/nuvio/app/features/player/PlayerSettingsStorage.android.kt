@@ -21,6 +21,9 @@ actual object PlayerSettingsStorage {
     private const val preferencesName = "nuvio_player_settings"
     private const val showLoadingOverlayKey = "show_loading_overlay"
     private const val showParentalGuideKey = "show_parental_guide"
+    // Phone orientation is local to this device and profile, not cloud-synced.
+    private const val orientationPreferenceKey = "player_orientation_preference"
+    private const val lastPlayerOrientationKey = "last_player_orientation"
     private const val resizeModeKey = "resize_mode"
     private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
     private const val holdToSpeedValueKey = "hold_to_speed_value"
@@ -198,6 +201,26 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(showParentalGuideKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadOrientationPreference(): String? =
+        preferences?.getString(ProfileScopedKey.of(orientationPreferenceKey), null)
+
+    actual fun saveOrientationPreference(preference: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(orientationPreferenceKey), preference)
+            ?.apply()
+    }
+
+    actual fun loadLastPlayerOrientation(): String? =
+        preferences?.getString(ProfileScopedKey.of(lastPlayerOrientationKey), null)
+
+    actual fun saveLastPlayerOrientation(orientation: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(lastPlayerOrientationKey), orientation)
             ?.apply()
     }
 
