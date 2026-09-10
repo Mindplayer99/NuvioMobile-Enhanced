@@ -23,10 +23,9 @@ import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
-private const val gitHubOwner = "luqmanfadlli"
-private const val gitHubRepo = "NuvioMobile-iOS"
+private const val gitHubOwner = "Mindplayer99"
+private const val gitHubRepo = "NuvioMobile-Enhanced"
 private const val gitHubApiBase = "https://api.github.com"
-private const val releaseChannelBranch = "enhanced"
 
 data class AppUpdate(
     val tag: String,
@@ -80,7 +79,7 @@ private class NoChannelReleaseException : IllegalStateException(
     runBlocking { getString(Res.string.updates_no_channel_release) },
 )
 
-private object VersionUtils {
+internal object VersionUtils {
     fun normalize(raw: String?): String {
         if (raw.isNullOrBlank()) return ""
         return raw.trim().removePrefix("v").removePrefix("V")
@@ -117,6 +116,16 @@ private object VersionUtils {
     }
 }
 
+internal object OrientationUpdateChannel {
+    private val tagPattern = Regex("[0-9]+\\.[0-9]+\\.[0-9]+-orientation")
+
+    fun matchesTag(tag: String?): Boolean = tag != null && tagPattern.matches(tag)
+
+    fun assetName(tag: String): String? = if (matchesTag(tag)) {
+        "Nuvio-Enhanced-${tag.removeSuffix("-orientation")}-Orientation-Full-arm64-v8a.apk"
+    } else null
+}
+
 private object AppUpdaterRepository {
     suspend fun getLatestChannelUpdate(): Result<AppUpdate> = runCatching {
         val response = httpRequestRaw(
@@ -133,14 +142,21 @@ private object AppUpdaterRepository {
         }
 
         val releases = appUpdaterJson.decodeFromString<List<GitHubReleaseDto>>(response.body)
-        val release = releases.firstOrNull { it.matchesRequestedChannel() && !it.draft && !it.prerelease }
+        val release = releases.filter { OrientationUpdateChannel.matchesTag(it.tagName) && !it.draft && !it.prerelease }
+            .maxWithOrNull(Comparator { left, right ->
+                when {
+                    VersionUtils.isRemoteNewer(left.tagName, right.tagName) -> 1
+                    VersionUtils.isRemoteNewer(right.tagName, left.tagName) -> -1
+                    else -> 0
+                }
+            })
             ?: throw NoChannelReleaseException()
 
         val tag = release.tagName?.takeIf { it.isNotBlank() }
             ?: release.name?.takeIf { it.isNotBlank() }
             ?: error(getString(Res.string.updates_release_missing_title))
 
-        val asset = chooseBestApkAsset(release.assets)
+        val asset = chooseBestApkAsset(release.assets, tag)
             ?: error(getString(Res.string.updates_apk_asset_missing))
 
         AppUpdate(
@@ -154,37 +170,10 @@ private object AppUpdaterRepository {
         )
     }
 
-    private fun GitHubReleaseDto.matchesRequestedChannel(): Boolean {
-        val channel = releaseChannelBranch
-        if (targetCommitish?.trim()?.equals(channel, ignoreCase = true) == true) {
-            return true
-        }
-
-        return listOf(tagName, name)
-            .filterNotNull()
-            .any { value -> value.contains(channel, ignoreCase = true) }
-    }
-
-    private fun chooseBestApkAsset(assets: List<GitHubAssetDto>): GitHubAssetDto? {
-        val apkAssets = assets.filter { asset ->
-            asset.name.endsWith(".apk", ignoreCase = true) ||
-                asset.contentType == "application/vnd.android.package-archive"
-        }
-        if (apkAssets.isEmpty()) return null
-        if (apkAssets.size == 1) return apkAssets.first()
-
-        val supportedAbis = AppUpdaterPlatform.getSupportedAbis()
-        for (abi in supportedAbis) {
-            val candidate = apkAssets.firstOrNull { asset ->
-                asset.name.contains(abi, ignoreCase = true)
-            }
-            if (candidate != null) return candidate
-        }
-
-        return apkAssets.firstOrNull { asset ->
-            val name = asset.name.lowercase()
-            name.contains("universal") || name.contains("all")
-        } ?: apkAssets.first()
+    private fun chooseBestApkAsset(assets: List<GitHubAssetDto>, tag: String): GitHubAssetDto? {
+        if ("arm64-v8a" !in AppUpdaterPlatform.getSupportedAbis()) return null
+        val expectedName = OrientationUpdateChannel.assetName(tag) ?: return null
+        return assets.singleOrNull { it.name == expectedName }
     }
 }
 
