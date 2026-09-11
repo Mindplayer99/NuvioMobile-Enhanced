@@ -33,6 +33,7 @@ jobs:
         run: python3 tools/scripts/orientation-release.py configure --source upstream
       - name: Measure complete host suite without changing upstream
         run: |
+          set +e
           set -uo pipefail
           cd upstream
           test "$(git rev-parse HEAD)" = fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac || exit 1
