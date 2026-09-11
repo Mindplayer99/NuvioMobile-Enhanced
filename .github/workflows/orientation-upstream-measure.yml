@@ -1,0 +1,55 @@
+name: Measure untouched upstream 0.4.16 host tests
+on:
+  push:
+    branches: [ops/orientation-0416-upstream-tests]
+permissions:
+  contents: read
+jobs:
+  upstream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: tools
+      - uses: actions/checkout@v6
+        with:
+          repository: luqmanfadlli/NuvioMobile-Enhanced
+          ref: fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac
+          path: upstream
+          lfs: true
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+      - name: Load existing runtime configuration privately
+        env:
+          NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+          NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: python3 tools/scripts/orientation-release.py configure --source upstream
+      - name: Measure complete host suite without changing upstream
+        run: |
+          set -uo pipefail
+          cd upstream
+          test "$(git rev-parse HEAD)" = fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac || exit 1
+          ./gradlew :composeApp:testAndroidHostTest -Pnuvio.android.distribution=full --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g 2>&1 | tee ../upstream-gradle.log
+          result=${PIPESTATUS[0]}
+          git diff --exit-code || exit 1
+          printf '{"commit":"fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac","gradle_exit":%s,"tracked_source_unchanged":true}\n' "$result" > ../upstream-result.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: exact-upstream-0.4.16-tests
+          path: |
+            upstream/composeApp/build/test-results/
+            upstream/composeApp/build/reports/tests/
+            upstream-result.json
+            upstream-gradle.log
+          if-no-files-found: error
+      - name: Remove private configuration
+        if: always()
+        run: rm -f upstream/local.properties "$RUNNER_TEMP/orientation-release.jks"
