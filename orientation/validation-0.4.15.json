@@ -1,0 +1,39 @@
+{
+  "version": "0.4.15",
+  "version_code": 120,
+  "package": "com.nuvio.media",
+  "abi": "arm64-v8a",
+  "source_commit": "800abba8c44559946b05fcefc3d62474f0cb3752",
+  "upstream_tag": "0.4.15",
+  "upstream_commit": "655e8766f304f196e6c5860e16eef9cc9cdc65e9",
+  "apk_sha256": "f2e05cd6daf7072f5706f7bdbc2acce0b602109e9c9f099b00b12dc87bb0d8fb",
+  "signer_sha256": "99e3d93e7600c178e71bf80ded2b1d97664e3ef14058c473c4617cb27fd04e35",
+  "release_run": "https://github.com/Mindplayer99/NuvioMobile-Enhanced/actions/runs/34632175260",
+  "release_regression_tests": 127,
+  "failures": 0,
+  "errors": 0,
+  "preserved_0_4_14_regression_tests": 90,
+  "physical_device_tested": false,
+  "source_delta_replay_verified": true,
+  "full_host_tests": 875,
+  "full_host_failures": 4,
+  "full_host_errors": 0,
+  "full_host_run": "https://github.com/Mindplayer99/NuvioMobile-Enhanced/actions/runs/34633413131",
+  "full_host_publication_blocked": true,
+  "full_host_failure_origin": "The failing tests and corresponding production files are unchanged from exact upstream 0.4.15.",
+  "full_host_failures_detail": [
+    "BackendRateLimitTest: expected 60250ms, actual 30250ms; upstream intentionally added a 30-second cap but retained the old test expectation.",
+    "ThemeSettingsRepositoryTest: three failures involving custom-theme selection and saved gradient handling; upstream production code differs from the tested behavior."
+  ],
+  "future_upstream_review": {
+    "tag": "0.4.16",
+    "commit": "fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac",
+    "protected_changes": [
+      ".github/workflows/mobile-release.yml",
+      "androidApp/build.gradle.kts",
+      "composeApp/build.gradle.kts",
+      "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsScreen.kt",
+      "gradle/libs.versions.toml"
+    ]
+  }
+}
