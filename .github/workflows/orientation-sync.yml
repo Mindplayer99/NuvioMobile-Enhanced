@@ -1,0 +1,109 @@
+name: Integrate stable Enhanced releases into Orientation
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Check latest upstream, reproduce canonical baseline, or publish a safe update
+        type: choice
+        options: [dry-run, baseline, publish]
+        default: dry-run
+  push:
+    branches: [ops/orientation-automation]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: orientation-releases
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    if: github.repository == 'Mindplayer99/NuvioMobile-Enhanced'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Test integration and publication rejection gates
+        run: |
+          python3 scripts/test-orientation-release.py
+          python3 scripts/test-orientation-sync.py
+      - name: Select exact upstream and apply canonical delta
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode || (github.event_name == 'push' && 'baseline') || 'publish' }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ "$MODE" == baseline ]]; then args+=(--baseline); fi
+          python3 scripts/orientation-sync.py prepare --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" "${args[@]}"
+          echo "status=$(jq -r .status "$RUNNER_TEMP/orientation-plan.json")" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v5
+        if: steps.candidate.outputs.status == 'ready'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        if: steps.candidate.outputs.status == 'ready'
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.candidate.outputs.status == 'ready'
+      - name: Install existing private release configuration
+        if: steps.candidate.outputs.status == 'ready'
+        env:
+          NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+          NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: python3 scripts/orientation-release.py configure --source "$RUNNER_TEMP/orientation-source"
+      - name: Run app regression tests and build Full ARM64
+        if: steps.candidate.outputs.status == 'ready'
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/orientation-source"
+          ./gradlew :composeApp:testAndroidHostTest -Pnuvio.android.distribution=full \
+            --tests 'com.nuvio.app.features.player.*' \
+            --tests 'com.nuvio.app.features.downloads.*' \
+            --tests 'com.nuvio.app.features.updater.*' \
+            --tests 'com.nuvio.app.features.home.components.*' \
+            --tests 'com.nuvio.app.features.settings.*' \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+          ./gradlew :androidApp:assembleFullRelease -Pnuvio.android.distribution=full -Pnuvio.android.abis=arm64-v8a \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+      - name: Verify signed APK against integration plan
+        if: steps.candidate.outputs.status == 'ready'
+        id: verified
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find "$RUNNER_TEMP/orientation-source/androidApp/build/outputs/apk/full/release" -name '*.apk')
+          test "${#apks[@]}" = 1
+          python3 scripts/orientation-sync.py verify --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "${apks[0]}"
+          echo "apk=${apks[0]}" >> "$GITHUB_OUTPUT"
+      - name: Publish verified Orientation release
+        if: steps.candidate.outputs.status == 'ready' && github.ref_name == github.event.repository.default_branch && (github.event_name == 'schedule' || inputs.mode == 'publish')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.verified.outputs.apk }}
+        run: python3 scripts/orientation-sync.py publish --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "$APK"
+      - name: Retain integration plan and test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orientation-integration-reports
+          path: |
+            ${{ runner.temp }}/orientation-plan.json
+            ${{ runner.temp }}/orientation-source/composeApp/build/reports/tests/
+            ${{ runner.temp }}/orientation-source/composeApp/build/test-results/
+          if-no-files-found: ignore
+      - name: Record blocked automatic integration
+        if: failure() && github.ref_name == github.event.repository.default_branch && (github.event_name == 'schedule' || inputs.mode == 'publish')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/orientation-sync.py report
+      - name: Remove private configuration
+        if: always()
+        run: rm -f "$RUNNER_TEMP/orientation-release.jks" "$RUNNER_TEMP/orientation-source/local.properties"

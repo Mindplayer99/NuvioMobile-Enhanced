@@ -128,7 +128,7 @@ def publish(source, version, apk):
                 "Uploaded asset digest mismatch")
         verify(source, version, remote)
     api(f"releases/{release['id']}", "--method", "PATCH", "-F", "draft=false",
-        "-f", "make_latest=" + ("true" if version == "0.4.15" else "false"))
+        "-f", "make_latest=" + ("false" if version == "0.4.14" else "true"))
     published = api(f"releases/{release['id']}")
     require(not published["draft"], "Release is still a draft")
     print(next(a["browser_download_url"] for a in published["assets"] if a["name"] == name))
