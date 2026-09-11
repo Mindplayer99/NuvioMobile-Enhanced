@@ -15,7 +15,7 @@ REPO = "Mindplayer99/NuvioMobile-Enhanced"
 CERT = "99e3d93e7600c178e71bf80ded2b1d97664e3ef14058c473c4617cb27fd04e35"
 BUILDS = {
     "0.4.14": ("fd7577e141b8647a2a26963d5f4157be76cc45bd", 118, "0.4.14-orientation-final"),
-    "0.4.15": ("8f268dcd0f944e35b71ded9ddc1168a4fae8c309", 120, "0.4.15-orientation"),
+    "0.4.15": ("800abba8c44559946b05fcefc3d62474f0cb3752", 120, "0.4.15-orientation"),
 }
 
 
@@ -129,7 +129,9 @@ def publish(source, version, apk):
         verify(source, version, remote)
     api(f"releases/{release['id']}", "--method", "PATCH", "-F", "draft=false",
         "-f", "make_latest=" + ("true" if version == "0.4.15" else "false"))
-    print(assets[0]["browser_download_url"])
+    published = api(f"releases/{release['id']}")
+    require(not published["draft"], "Release is still a draft")
+    print(next(a["browser_download_url"] for a in published["assets"] if a["name"] == name))
 
 
 def main():

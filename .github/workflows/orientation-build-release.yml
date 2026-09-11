@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v6
       - name: Check out immutable 0.4.14 source
@@ -79,7 +79,7 @@ jobs:
       - name: Check out exact integrated 0.4.15 source
         uses: actions/checkout@v6
         with:
-          ref: 8f268dcd0f944e35b71ded9ddc1168a4fae8c309
+          ref: 800abba8c44559946b05fcefc3d62474f0cb3752
           path: source-0.4.15
           fetch-depth: 0
           lfs: true
@@ -91,7 +91,7 @@ jobs:
           git fetch https://github.com/luqmanfadlli/NuvioMobile-Enhanced.git refs/tags/0.4.15
           test "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$base"
           git merge-base --is-ancestor "$base" HEAD
-          test "$(git rev-list --count "$base..HEAD")" = 4
+          test "$(git rev-list --count "$base..HEAD")" = 5
       - name: Build, verify, and publish 0.4.15 Orientation
         shell: bash
         run: |
