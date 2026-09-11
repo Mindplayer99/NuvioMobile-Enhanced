@@ -1,0 +1,126 @@
+name: Build and preserve pinned Orientation releases
+on:
+  push:
+    branches: [ops/orientation-build-release]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: orientation-releases
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    if: github.repository == 'Mindplayer99/NuvioMobile-Enhanced'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+      NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: release-tools
+          fetch-depth: 1
+      - name: Test release rejection gates
+        run: python3 release-tools/scripts/test-orientation-release.py
+      - name: Require secure signing configuration
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in NUVIO_RELEASE_KEYSTORE_BASE64 NUVIO_LOCAL_PROPERTIES_BASE64; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing Actions secret: ${name}"
+              missing=1
+            fi
+          done
+          test "$missing" = 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Check out immutable 0.4.14 source
+        uses: actions/checkout@v6
+        with:
+          ref: fd7577e141b8647a2a26963d5f4157be76cc45bd
+          path: source-0.4.14
+          fetch-depth: 0
+          lfs: true
+      - name: Verify preserved references
+        run: |
+          set -euo pipefail
+          expected=fd7577e141b8647a2a26963d5f4157be76cc45bd
+          for ref in heads/backup/orientation-0.4.14-final tags/0.4.14-orientation-final; do
+            actual="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref}" --jq .object.sha)"
+            test "$actual" = "$expected"
+          done
+      - name: Build, verify, and permanently preserve 0.4.14
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 release-tools/scripts/orientation-release.py configure --source source-0.4.14
+          cd source-0.4.14
+          ./gradlew :composeApp:testAndroidHostTest \
+            -Pnuvio.android.distribution=full --tests 'com.nuvio.app.features.player.*' \
+            --tests 'com.nuvio.app.features.home.components.HomeHeroSectionTest' \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+          ./gradlew :androidApp:assembleFullRelease \
+            -Pnuvio.android.distribution=full -Pnuvio.android.abis=arm64-v8a \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+          cd ..
+          mapfile -t apks < <(find source-0.4.14/androidApp/build/outputs/apk/full/release -name '*.apk')
+          test "${#apks[@]}" = 1
+          python3 release-tools/scripts/orientation-release.py publish --source source-0.4.14 --version 0.4.14 --apk "${apks[0]}"
+      - name: Check out exact integrated 0.4.15 source
+        uses: actions/checkout@v6
+        with:
+          ref: 8f268dcd0f944e35b71ded9ddc1168a4fae8c309
+          path: source-0.4.15
+          fetch-depth: 0
+          lfs: true
+      - name: Verify exact upstream baseline
+        working-directory: source-0.4.15
+        run: |
+          set -euo pipefail
+          base=655e8766f304f196e6c5860e16eef9cc9cdc65e9
+          git fetch https://github.com/luqmanfadlli/NuvioMobile-Enhanced.git refs/tags/0.4.15
+          test "$(git rev-parse 'FETCH_HEAD^{commit}')" = "$base"
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-list --count "$base..HEAD")" = 4
+      - name: Build, verify, and publish 0.4.15 Orientation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 release-tools/scripts/orientation-release.py configure --source source-0.4.15
+          cd source-0.4.15
+          ./gradlew :composeApp:testAndroidHostTest -Pnuvio.android.distribution=full \
+            --tests 'com.nuvio.app.features.player.*' \
+            --tests 'com.nuvio.app.features.downloads.*' \
+            --tests 'com.nuvio.app.features.updater.*' \
+            --tests 'com.nuvio.app.features.home.components.HomeHeroSectionTest' \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+          ./gradlew :androidApp:assembleFullRelease \
+            -Pnuvio.android.distribution=full -Pnuvio.android.abis=arm64-v8a \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+          cd ..
+          mapfile -t apks < <(find source-0.4.15/androidApp/build/outputs/apk/full/release -name '*.apk')
+          test "${#apks[@]}" = 1
+          python3 release-tools/scripts/orientation-release.py publish --source source-0.4.15 --version 0.4.15 --apk "${apks[0]}"
+      - name: Retain test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orientation-release-test-reports
+          path: |
+            source-*/composeApp/build/reports/tests/
+            source-*/composeApp/build/test-results/
+          if-no-files-found: ignore
+      - name: Remove private build configuration
+        if: always()
+        run: |
+          rm -f "${RUNNER_TEMP}/orientation-release.jks" source-0.4.14/local.properties source-0.4.15/local.properties
