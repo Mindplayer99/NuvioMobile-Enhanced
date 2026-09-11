@@ -179,6 +179,10 @@ def publish(source, plan_path, apk):
     plan = load_plan(source, plan_path)
     require(not plan['baseline'], 'Baseline dry run cannot publish')
     record = release.verify(source, plan['version'], apk)
+    upstream = [r for r in stable(list_releases(UPSTREAM)) if r['tag_name'] == plan['version']]
+    require(len(upstream) == 1, 'Upstream release was removed or is no longer stable')
+    git('fetch', '--no-tags', 'https://github.com/' + UPSTREAM + '.git', 'refs/tags/' + plan['version'])
+    require(git('rev-parse', 'FETCH_HEAD^{commit}') == plan['upstream_commit'], 'Upstream tag moved during the build')
     _, _, current = current_release(config())
     require(current == plan['previous_commit'], 'Another release was published; start from its state')
     current_ref = release.api('git/ref/heads/orientation-current', optional=True)

@@ -62,6 +62,19 @@ class IntegrationGateTests(unittest.TestCase):
             git.assert_not_called()
             publish.assert_not_called()
 
+    def test_retagged_upstream_prevents_publication(self):
+        plan = {'baseline': False, 'version': '0.4.16', 'upstream_commit': 'expected'}
+        rows = [{'tag_name': '0.4.16', 'draft': False, 'prerelease': False}]
+        with patch.object(sync, 'load_plan', return_value=plan), \
+             patch.object(sync.release, 'verify', return_value={}), \
+             patch.object(sync, 'list_releases', return_value=rows), \
+             patch.object(sync, 'git', side_effect=['', 'moved']) as git, \
+             patch.object(sync.release, 'publish') as publish:
+            with self.assertRaisesRegex(RuntimeError, 'tag moved'):
+                sync.publish(Path('.'), Path('plan.json'), Path('app.apk'))
+            publish.assert_not_called()
+            self.assertFalse(any(c.args[0] == 'push' for c in git.call_args_list))
+
     def test_baseline_can_never_publish(self):
         with patch.object(sync, 'load_plan', return_value={'baseline': True}), \
              patch.object(sync.release, 'verify') as verify:
