@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,6 +79,7 @@ fun SubtitleStylePanel(
     onAutoSyncCapture: () -> Unit,
     onAutoSyncCueSelected: (SubtitleSyncCue) -> Unit,
     onAutoSyncReload: () -> Unit,
+    wrapControls: Boolean = false,
 ) {
     val sectionGap = if (isCompact) 12.dp else 16.dp
 
@@ -133,6 +136,7 @@ fun SubtitleStylePanel(
 
         SubtitleStyleSection(title = stringResource(Res.string.compose_player_color)) {
             SubtitleColorPicker(
+                wrapControls = wrapControls,
                 colors = SubtitleColorSwatches,
                 selectedColor = style.textColor,
                 onColorSelected = { color ->
@@ -167,6 +171,7 @@ fun SubtitleStylePanel(
                 style = MaterialTheme.typography.bodySmall,
             )
             SubtitleColorPicker(
+                wrapControls = wrapControls,
                 colors = SubtitleOutlineColorSwatches,
                 selectedColor = style.outlineColor,
                 enabled = style.outlineEnabled,
@@ -189,6 +194,7 @@ fun SubtitleStylePanel(
         }
 
         SubtitleAutoSyncSection(
+            wrapControls = wrapControls,
             selectedAddonSubtitle = selectedAddonSubtitle,
             state = subtitleAutoSyncState,
             onCapture = onAutoSyncCapture,
@@ -305,20 +311,16 @@ private fun SubtitleToggleChip(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SubtitleColorPicker(
     colors: List<Color>,
     selectedColor: Color,
     onColorSelected: (Color) -> Unit,
     enabled: Boolean = true,
+    wrapControls: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .alpha(if (enabled) 1f else 0.42f),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    val swatches: @Composable () -> Unit = {
         colors.forEach { color ->
             val selected = sameRgb(color, selectedColor)
             Box(
@@ -335,8 +337,23 @@ private fun SubtitleColorPicker(
             )
         }
     }
+    if (wrapControls) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.42f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { swatches() }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .alpha(if (enabled) 1f else 0.42f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) { swatches() }
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SubtitleAutoSyncSection(
     selectedAddonSubtitle: AddonSubtitle?,
@@ -344,6 +361,7 @@ private fun SubtitleAutoSyncSection(
     onCapture: () -> Unit,
     onCueSelected: (SubtitleSyncCue) -> Unit,
     onReload: () -> Unit,
+    wrapControls: Boolean = false,
 ) {
     val tokens = MaterialTheme.nuvio
     val capturedPositionMs = state.capturedPositionMs
@@ -359,7 +377,7 @@ private fun SubtitleAutoSyncSection(
     }
 
     SubtitleStyleSection(title = stringResource(Res.string.compose_player_auto_sync)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val actions: @Composable () -> Unit = {
             SubtitleTextAction(
                 label = stringResource(Res.string.compose_player_reload),
                 enabled = selectedAddonSubtitle != null,
@@ -370,6 +388,15 @@ private fun SubtitleAutoSyncSection(
                 enabled = selectedAddonSubtitle != null,
                 onClick = onCapture,
             )
+        }
+        if (wrapControls) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) { actions() }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
         }
 
         when {

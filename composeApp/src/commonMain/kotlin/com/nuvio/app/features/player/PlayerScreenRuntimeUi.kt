@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 
 @Composable
-internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
+internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Unit)? = null) {
     val runtime = this
     val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
     val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
@@ -293,7 +293,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             )
         }
 
-        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode)
+        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen)
         RenderPlaybackOverlays(
             runtime = runtime,
             displayedPositionMs = displayedPositionMs,
@@ -327,10 +327,15 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
 }
 
 @Composable
-private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, isEpisode: Boolean) {
+private fun PlayerScreenRuntime.RenderPlayerControls(
+    displayedPositionMs: Long,
+    isEpisode: Boolean,
+    onRotateScreen: (() -> Unit)?,
+) {
     val isInPip = rememberIsInPictureInPicture()
+    val compactTrackModalOpen = metrics.compactControls && (showAudioModal || showSubtitleModal)
     AnimatedVisibility(
-        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
+        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !compactTrackModalOpen,
         enter = fadeIn(),
         exit = fadeOut(),
     ) {
@@ -359,6 +364,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onSeekBack = { seekBy(-10_000L) },
             onSeekForward = { seekBy(10_000L) },
             onResizeModeClick = { cycleResizeMode() },
+            onRotateScreen = onRotateScreen?.let { rotate ->
+                {
+                    rotate()
+                    controlsVisible = true
+                }
+            },
             onSpeedClick = if (!isLiveTvPlayback) {
                 {
                     cyclePlaybackSpeed()
@@ -637,9 +648,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             scope.launch {
                 kotlinx.coroutines.delay(200)
                 showAudioModal = false
+                if (metrics.compactControls) controlsVisible = true
             }
         },
-        onAudioModalDismissed = { showAudioModal = false },
+        onAudioModalDismissed = {
+            showAudioModal = false
+            if (metrics.compactControls) controlsVisible = true
+        },
         showSubtitleModal = showSubtitleModal,
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,
@@ -682,7 +697,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
         onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
         onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
-        onSubtitleModalDismissed = { showSubtitleModal = false },
+        onSubtitleModalDismissed = {
+            showSubtitleModal = false
+            if (metrics.compactControls) controlsVisible = true
+        },
         showVideoSettingsModal = showVideoSettingsModal,
         playerSettings = playerSettingsUiState,
         onVideoSettingsChanged = {

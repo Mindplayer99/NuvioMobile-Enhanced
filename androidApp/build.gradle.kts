@@ -47,6 +47,10 @@ val buildsReleaseApks = requestedTaskNames.any {
     it.startsWith("assemble", ignoreCase = true) && it.endsWith("Release", ignoreCase = true)
 }
 
+// Supported public DSL: limit release splits for the Orientation ARM64 pipeline.
+val releaseAbis = providers.gradleProperty("nuvio.android.abis").orNull
+    ?.split(',')?.map(String::trim)?.filter(String::isNotEmpty)
+
 android {
     namespace = "com.nuvio.android"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -111,7 +115,7 @@ android {
         abi {
             isEnable = buildsReleaseApks
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include(*(releaseAbis ?: listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")).toTypedArray())
             isUniversalApk = false
         }
     }
