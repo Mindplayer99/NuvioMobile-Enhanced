@@ -30,7 +30,7 @@ only its version name/code; the code must increase. This deliberately preserves 
 working release when automatic compatibility cannot be established. New feature changes
 outside these protected areas can proceed through compilation and regression tests.
 
-The pipeline runs player, downloads, updater, home, and settings host tests, builds Full
+The pipeline runs the complete Android host test suite (including shared tests), builds Full
 ARM64, and checks the exact source, package, version, versionCode, non-debuggable status,
 Full native libraries, and installed signing certificate. It uploads a draft, downloads
 and verifies the actual remote bytes, then publishes. Existing public releases and tags
@@ -43,7 +43,7 @@ one review issue and retains test reports. It cannot replace a working APK with 
 The workflow supports `dry-run` (next upstream through tests/build/verification, no publish),
 `baseline` (reproduce the canonical source tree and test/build it, no publish), and `publish`.
 Only scheduled runs or explicit publish runs on the default branch can publish. Pushes to
-`ops/orientation-automation` run a baseline check. All runs share a non-cancelling concurrency
+`ops/orientation-automation` run a baseline check; tool changes on `enhanced` check the next upstream release without publishing. All runs share a non-cancelling concurrency
 group with the initial pinned-release pipeline.
 
 When a future change is blocked, review it against the existing Orientation behavior, retain

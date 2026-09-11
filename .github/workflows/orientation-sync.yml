@@ -10,7 +10,8 @@ on:
         options: [dry-run, baseline, publish]
         default: dry-run
   push:
-    branches: [ops/orientation-automation]
+    branches: [ops/orientation-automation, enhanced]
+    paths: [orientation/**, scripts/orientation-*.py, scripts/test-orientation-*.py, .github/workflows/orientation-sync.yml]
 
 permissions:
   contents: write
@@ -38,7 +39,7 @@ jobs:
         id: candidate
         env:
           GH_TOKEN: ${{ github.token }}
-          MODE: ${{ inputs.mode || (github.event_name == 'push' && 'baseline') || 'publish' }}
+          MODE: ${{ inputs.mode || (github.ref_name == 'ops/orientation-automation' && 'baseline') || (github.event_name == 'push' && 'dry-run') || 'publish' }}
         run: |
           set -euo pipefail
           args=()
@@ -66,11 +67,6 @@ jobs:
           set -euo pipefail
           cd "$RUNNER_TEMP/orientation-source"
           ./gradlew :composeApp:testAndroidHostTest -Pnuvio.android.distribution=full \
-            --tests 'com.nuvio.app.features.player.*' \
-            --tests 'com.nuvio.app.features.downloads.*' \
-            --tests 'com.nuvio.app.features.updater.*' \
-            --tests 'com.nuvio.app.features.home.components.*' \
-            --tests 'com.nuvio.app.features.settings.*' \
             --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
           ./gradlew :androidApp:assembleFullRelease -Pnuvio.android.distribution=full -Pnuvio.android.abis=arm64-v8a \
             --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
