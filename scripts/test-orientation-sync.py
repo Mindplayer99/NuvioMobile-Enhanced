@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import os
 import unittest
 from unittest.mock import patch
 
@@ -81,6 +82,16 @@ class IntegrationGateTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 sync.publish(Path('.'), Path('plan.json'), Path('app.apk'))
             verify.assert_not_called()
+
+    def test_disabled_issues_preserve_actionable_failure_summary(self):
+        with tempfile.TemporaryDirectory() as d:
+            summary = Path(d) / 'summary.md'
+            with patch.dict(os.environ, GITHUB_RUN_ID='123', GITHUB_STEP_SUMMARY=str(summary)), \
+                 patch.object(sync.release, 'run', return_value='{"has_issues":false}'), \
+                 patch.object(sync.release, 'api') as api:
+                sync.report_failure()
+                api.assert_not_called()
+                self.assertIn('actions/runs/123', summary.read_text())
 
     def test_canonical_patch_matches_saved_reviewed_source(self):
         m = sync.config()

@@ -35,8 +35,9 @@ ARM64, and checks the exact source, package, version, versionCode, non-debuggabl
 Full native libraries, and installed signing certificate. It uploads a draft, downloads
 and verifies the actual remote bytes, then publishes. Existing public releases and tags
 are never overwritten. `orientation-current` advances only after successful publication;
-immutable release tags retain all previous versions. A failed scheduled/publish run opens
-one review issue and retains test reports. It cannot replace a working APK with a failed build.
+immutable release tags retain all previous versions. A failed scheduled/publish run records
+an Actions summary and retains test reports. It also opens one review issue when repository
+Issues are enabled. This repository currently has Issues disabled, so Actions is the failure channel. It cannot replace a working APK with a failed build.
 
 ## Manual checks and maintenance
 

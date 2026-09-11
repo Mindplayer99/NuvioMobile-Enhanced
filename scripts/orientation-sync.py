@@ -207,10 +207,19 @@ def publish(source, plan_path, apk):
 
 def report_failure():
     title = 'Orientation integration requires review'
+    url = f"https://github.com/{REPO}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+    message = ('The automatic integration stopped. The previous working release is preserved. '
+               'Inspect the failed gate and retained test reports: ' + url)
+    if os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+            summary.write('## ' + title + '\n\n' + message + '\n')
+    repository = json.loads(release.run('gh', 'api', f'repos/{REPO}'))
+    if not repository.get('has_issues', False):
+        print('Issues are disabled; the blocked integration is recorded in the Actions summary and logs.')
+        return
     issues = release.api('issues?state=open&per_page=100')
     if any(i['title'] == title for i in issues):
         return
-    url = f"https://github.com/{REPO}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
     release.api('issues', '--method', 'POST', '-f', 'title=' + title, '-f', 'body=' +
                 'The automatic integration stopped before publishing an unsafe update. '
                 'The previous working release is preserved. Inspect the failed gate and test reports: ' + url)
