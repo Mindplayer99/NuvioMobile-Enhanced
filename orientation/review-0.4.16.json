@@ -1,0 +1,313 @@
+{
+  "upstream_tag": "0.4.16",
+  "upstream_commit": "fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac",
+  "upstream_previous": "655e8766f304f196e6c5860e16eef9cc9cdc65e9",
+  "upstream_commits": 37,
+  "orientation_commit": "a4b5f98a0f8ad82aa848ce426d7e87351deebc41",
+  "canonical_tree": "d7f57930a55aaa2740a46667c9f8482edb69a12c",
+  "canonical_paths": 23,
+  "orientation_files_byte_identical_to_0415": [
+    "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationAndroidTest.kt",
+    "composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt",
+    "composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt",
+    "composeApp/src/commonMain/composeResources/values/player_orientation.xml",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerLayout.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOrientation.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleStylePanel.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt",
+    "composeApp/src/commonTest/kotlin/com/nuvio/app/features/player/PlayerOrientationTest.kt",
+    "composeApp/src/commonTest/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannelTest.kt",
+    "composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.ios.kt",
+    "composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.ios.kt"
+  ],
+  "reviewed_paths": [
+    {
+      "path": ".github/workflows/mobile-release.yml",
+      "review": "Upstream mobile release behavior is separate from downstream pinned release tooling; source workflow retained unchanged.",
+      "candidate_blob": "d305eda830f65d6a9c5b18cc329f8827f102702e"
+    },
+    {
+      "path": ".gitignore",
+      "review": "Ignore-list maintenance only; tracked source unchanged.",
+      "candidate_blob": "695cab0c6b929153c9f12ce77b460d9b2a38abef"
+    },
+    {
+      "path": "androidApp/build.gradle.kts",
+      "review": "Precise manual merge: retain upstream cvr noCompress and releaseMinifyEnabled; supported splits ABI option only. Signing/application identity unchanged.",
+      "candidate_blob": "f0e7165beec9cb2feea3de17622c04f1850d1bcb"
+    },
+    {
+      "path": "androidApp/src/main/baseline-prof.txt",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "100a8b7d1fb814292afac304ace5c8d98ec02a54"
+    },
+    {
+      "path": "composeApp/build.gradle.kts",
+      "review": "Compose UI test dependencies and removed Compottie loading dependency; no change to Orientation storage or platform effects. Exact upstream retained.",
+      "candidate_blob": "17bc0c3bbe9c5b20c56199ae0bc3e35095569b74"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/core/ui/PosterLiftSourceTest.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "395e9f781ab18a0feeb47cba5267288de784ca7b"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/core/ui/PosterOpenMotionTest.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "4ba8227ea7a8f2c988c405b54bffefb513b19ea2"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/core/ui/jelly/JellyMotionTest.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "861bac1bf8a97363bda42ce73bdcc9d021400784"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/navigation/PosterNavigationTest.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "e87fdc971e14f981917e6705d21dd4183afb1a46"
+    },
+    {
+      "path": "composeApp/src/androidMain/assets/licenses/react-native-jelly-tabs.txt",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "3f719267044327d17f7e5c61775773d0839a274c"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/Platform.android.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "5a9747bce83db1a8b37e7d475fd5b7c0b24d4e2e"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/FloatingNavigationBar.android.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "a934c5dbc2f1b236e8bb8053877517aaed2c5613"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/glass/GlassBarShader.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "1f11571921cbf9699f395963f402ab5f2921d598"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/glass/GlassBarSurface.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "52afeef6cad7f0691e5b52cc508194cd84926e8e"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/jelly/JellyDrawing.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "e86db75fc7176afd02095088842f2fff4ae46e81"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/jelly/JellyMotion.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "9df7d7e26fac3863502d57f686fc642581b7d77a"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/jelly/JellySpring.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "9fa9f66573f3a2c451c96432700c206ff04c7989"
+    },
+    {
+      "path": "composeApp/src/androidMain/kotlin/com/nuvio/app/core/ui/jelly/JellyTabs.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "62be2254f0ea991080acd252f33ad16e657cfb55"
+    },
+    {
+      "path": "composeApp/src/commonMain/composeResources/files/nuvio_loading_indicator.json",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "upstream deletion retained"
+    },
+    {
+      "path": "composeApp/src/commonMain/composeResources/values-el/strings.xml",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "924c89ca651eed2c0116d1ba24e2d1f3369b4949"
+    },
+    {
+      "path": "composeApp/src/commonMain/composeResources/values-nl/strings.xml",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "7a14f0e925d74a2e81a4615001796688dfd2fcb4"
+    },
+    {
+      "path": "composeApp/src/commonMain/composeResources/values-vi/strings.xml",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "9632f36a012f4dedb29c913d6e5a8dffea84a8fc"
+    },
+    {
+      "path": "composeApp/src/commonMain/composeResources/values/strings.xml",
+      "review": "Translations/resources/license/profile data retained verbatim from exact upstream.",
+      "candidate_blob": "885080b99692538c510c2437f3bb9c3ce4c33d86"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/MainAppContent.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "afaf2b773cce8a23560fd2c40629bfbbad7cfcee"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/Platform.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "71e936ce618204ef335535af529bdf73ce576a23"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/DisintegrationEffect.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "80861fa703086f705a0edf0673bc145945f28dd3"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/FloatingNavigationBar.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "2f22634bb3cc5f9b5d04fc14b0141cb865f0fcfa"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/LoadingIndicator.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "461f9738f355c10a8ceedd8b2d314d48510ea0c9"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/NavigationBar.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "baaca72e5f953a1cad3fea03be76b70e0d03b575"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/PosterLift.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "00ecd23a71850577f04f20d322d19821b606a741"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/PosterOpenMotion.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "e1f1176f902268ee99a62cf43606780fbd912105"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/PosterZoomActionOverlay.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "e1fe64f690eccb513c133f82f4877a581edbbb4e"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/ResourceLottieCompositionSpec.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "upstream deletion retained"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/core/ui/ShelfComponents.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "05a65d65284cc853b6cbe0ecf8f7848db27499f3"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/details/DetailsContentReveal.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "dd1fda727517da96c936855c62d415e95d093fe2"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/details/MetaScreenSettingsRepository.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "b859e0caa395b9943f0d3845c5d1cd53fe571bcf"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/library/LibraryScreen.kt",
+      "review": "Library header and saved-filter sticky layout only; player source/session/controls unchanged.",
+      "candidate_blob": "0ec95fe16791756f235a1d08c3e9a46e2c58af2c"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/MetaScreenSettingsPage.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "06eeb1efcef04010ca50fa4447be4d8aac001149"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsScreen.kt",
+      "review": "Upstream defers entry creation until a nonblank root search query. Supersedes downstream search optimization; exact upstream retained.",
+      "candidate_blob": "1bf43a21d0a20cdd3a6d5a8cf798b435dbd76c85"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt",
+      "review": "Upstream defers entry creation until a nonblank root search query. Supersedes downstream search optimization; exact upstream retained.",
+      "candidate_blob": "ebd9d8dfe31ae2f8fe520f59e3e63cf071da017f"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/ThemeSettingsRepository.kt",
+      "review": "Upstream corrects custom theme mode/palette and membership gradient persistence. All three former theme failures pass untouched upstream.",
+      "candidate_blob": "3401d5c9dcbf4d55634da4904e0aa207306b5ba0"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/TrackingSettingsPage.kt",
+      "review": "Trakt progress-dependent setting enabled state and description only; no playback orientation changes.",
+      "candidate_blob": "0dd5460c5641b87214c6c9d5558080b16f30ec00"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/features/streams/StreamsScreen.kt",
+      "review": "Stream page back button inset respects native tab visibility; player invocation and source selection unchanged.",
+      "candidate_blob": "eef5cc3bbac58f5cb80a7246998ae21a09e3c524"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/navigation/NuvioNavigator.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "ab439c1a5826cf837be9e13447873ba1312b8231"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/navigation/PosterNavigationArtwork.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "8a799526c115a24ae7e45d66d78ea15350d72620"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/navigation/PosterNavigationMotion.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "d2b890962412f756401ac9faf8aa24a83dda258a"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/navigation/PosterNavigationState.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "50b9a25e1577ed4f4286b46308f3c1f836be856f"
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/com/nuvio/app/navigation/PosterNavigationTransition.kt",
+      "review": "Poster transition hooks checked through navigator and NavEntry. Requests target DetailRoute only; PlayerRoute playback/orientation lifetime unchanged.",
+      "candidate_blob": "5ed708d7d0813fd42b369f501a2cc180e263bf62"
+    },
+    {
+      "path": "composeApp/src/commonTest/kotlin/com/nuvio/app/core/ui/ResourceLottieCompositionSpecTest.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "upstream deletion retained"
+    },
+    {
+      "path": "composeApp/src/iosMain/kotlin/com/nuvio/app/Platform.ios.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "bf1db263893ecc96feb2b688b79be123dc02b0cb"
+    },
+    {
+      "path": "composeApp/src/iosMain/kotlin/com/nuvio/app/core/ui/FloatingNavigationBar.ios.kt",
+      "review": "Complete upstream navigation artwork, jelly tabs, native loading indicator and detail poster transition retained; no requested-orientation or persistence API changes.",
+      "candidate_blob": "f99b6fa8f5ebede1adaf7ffabad62ffe0b6fa97d"
+    },
+    {
+      "path": "gradle/libs.versions.toml",
+      "review": "Compose UI test dependencies and removed Compottie loading dependency; no change to Orientation storage or platform effects. Exact upstream retained.",
+      "candidate_blob": "d647afa626433277efee0f139dfc64ce43390ed2"
+    },
+    {
+      "path": "iosApp/Configuration/Version.xcconfig",
+      "review": "Exact upstream version metadata retained: 0.4.16, versionCode121.",
+      "candidate_blob": "b2ca8754814a34a3dbd4faa6c82b4da1b2361023"
+    },
+    {
+      "path": "store.json",
+      "review": "Exact upstream version metadata retained: 0.4.16, versionCode121.",
+      "candidate_blob": "69621e9b182fcd809bdb96a9f77965faa76b359e"
+    }
+  ],
+  "raw_upstream_run": 34640006876,
+  "raw_upstream_tests": 884,
+  "raw_upstream_failures": [
+    "BackendRateLimitTest#retry delay uses bounded fallback and adds jitter",
+    "HomeHeroSectionTest#mobile hero height stays compact without continue watching",
+    "HomeHeroSectionTest#mobile hero height leaves room for continue watching card section",
+    "HomeHeroSectionTest#mobile hero can shrink below default minimum to fit short viewport"
+  ]
+}

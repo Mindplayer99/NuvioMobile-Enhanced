@@ -85,8 +85,11 @@ def api(path, *args, optional=False):
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def publish(source, version, apk):
+def publish(source, version, apk, evidence=None):
     record = verify(source, version, apk)
+    if evidence:
+        require(evidence['status'] == 'passed' and evidence['commit'] == record['commit'], 'Invalid test evidence')
+        record['tests'] = evidence
     commit, _, tag = BUILDS[version]
     require(os.environ.get("GITHUB_REPOSITORY") == REPO, "Publication restricted to the owner's repository")
     name = f"Nuvio-Enhanced-{version}-Orientation-Full-arm64-v8a.apk"
@@ -110,8 +113,11 @@ def publish(source, version, apk):
         release = api("releases", "--method", "POST", "-f", f"tag_name={tag}",
                       "-f", f"name=Nuvio Enhanced {version} Orientation", "-F", "draft=true",
                       "-F", "prerelease=false", "-f", "body=" +
-                      "Built from the exact preserved source. Full ARM64 release; installed-app signer verified. "
-                      "Automated tests and build passed. Real-device smoke testing remains required.\n\n" +
+                      "Built from the exact preserved source. Full ARM64 release; installed-app signer verified. " +
+                      ("Critical tests and Full ARM64 build passed. Broad suite: " +
+                       (str(len(evidence['inherited_failures'])) + " failures reproduced on the exact untouched upstream; no added candidate failures. "
+                        if evidence and evidence['inherited_failures'] else "passed. ") +
+                       "Real-device smoke testing remains required.\n\n") +
                       "Verification:\n```json\n" + json.dumps(record, indent=2) + "\n```")
     with tempfile.TemporaryDirectory() as temporary:
         target = Path(temporary) / name

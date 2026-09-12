@@ -16,6 +16,7 @@ on:
 permissions:
   contents: write
   issues: write
+  actions: read
 
 concurrency:
   group: orientation-releases
@@ -35,6 +36,13 @@ jobs:
         run: |
           python3 scripts/test-orientation-release.py
           python3 scripts/test-orientation-sync.py
+          python3 scripts/test-orientation-risk.py
+          python3 scripts/test-orientation-tests.py
+      - name: Reproduce canonical baseline on tooling updates
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/orientation-sync.py prepare --baseline --source "$RUNNER_TEMP/orientation-baseline" --plan "$RUNNER_TEMP/orientation-baseline.json"
       - name: Select exact upstream and apply canonical delta
         id: candidate
         env:
@@ -61,15 +69,11 @@ jobs:
           NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
           NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
         run: python3 scripts/orientation-release.py configure --source "$RUNNER_TEMP/orientation-source"
-      - name: Run app regression tests and build Full ARM64
+      - name: Critical tests, then shared regression suite and Full ARM64 assembly
         if: steps.candidate.outputs.status == 'ready'
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/orientation-source"
-          ./gradlew :composeApp:testAndroidHostTest -Pnuvio.android.distribution=full \
-            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
-          ./gradlew :androidApp:assembleFullRelease -Pnuvio.android.distribution=full -Pnuvio.android.abis=arm64-v8a \
-            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -Pkotlin.daemon.jvmargs=-Xmx2g
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/orientation-tests.py --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --report "$RUNNER_TEMP/orientation-reports"
       - name: Verify signed APK against integration plan
         if: steps.candidate.outputs.status == 'ready'
         id: verified
@@ -77,21 +81,27 @@ jobs:
           set -euo pipefail
           mapfile -t apks < <(find "$RUNNER_TEMP/orientation-source/androidApp/build/outputs/apk/full/release" -name '*.apk')
           test "${#apks[@]}" = 1
-          python3 scripts/orientation-sync.py verify --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "${apks[0]}"
+          python3 scripts/orientation-sync.py verify --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "${apks[0]}" --evidence "$RUNNER_TEMP/orientation-reports/test-evidence.json"
           echo "apk=${apks[0]}" >> "$GITHUB_OUTPUT"
       - name: Publish verified Orientation release
         if: steps.candidate.outputs.status == 'ready' && github.ref_name == github.event.repository.default_branch && (github.event_name == 'schedule' || inputs.mode == 'publish')
         env:
           GH_TOKEN: ${{ github.token }}
           APK: ${{ steps.verified.outputs.apk }}
-        run: python3 scripts/orientation-sync.py publish --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "$APK"
+        run: python3 scripts/orientation-sync.py publish --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "$APK" --evidence "$RUNNER_TEMP/orientation-reports/test-evidence.json"
       - name: Retain integration plan and test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: orientation-integration-reports
           path: |
+            ${{ runner.temp }}/orientation-baseline.json
             ${{ runner.temp }}/orientation-plan.json
+            ${{ runner.temp }}/orientation-risk.json
+            ${{ runner.temp }}/orientation-reports/test-evidence.json
+            ${{ runner.temp }}/orientation-reports/*-xml/
+            ${{ runner.temp }}/orientation-reports/*-tasks.jsonl
+            ${{ runner.temp }}/orientation-reports/*-gradle.log
             ${{ runner.temp }}/orientation-source/composeApp/build/reports/tests/
             ${{ runner.temp }}/orientation-source/composeApp/build/test-results/
           if-no-files-found: ignore

@@ -9,11 +9,18 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location('release', ROOT / 'scripts/orientation-release.py')
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+risk_spec = importlib.util.spec_from_file_location('risk', ROOT / 'scripts/orientation-risk.py')
+risk = importlib.util.module_from_spec(risk_spec)
+risk_spec.loader.exec_module(risk)
+test_spec = importlib.util.spec_from_file_location('tests', ROOT / 'scripts/orientation-tests.py')
+tests = importlib.util.module_from_spec(test_spec)
+test_spec.loader.exec_module(tests)
 MANIFEST = ROOT / 'orientation/manifest.json'
 UPSTREAM = 'luqmanfadlli/NuvioMobile-Enhanced'
 REPO = release.REPO
@@ -73,33 +80,29 @@ def metadata(text):
     return names[0], int(codes[0])
 
 
-def unsafe_paths(paths, delta_paths):
-    """Conservative: textual merge success cannot establish player compatibility."""
-    bad = []
-    for p in paths:
-        if p == 'iosApp/Configuration/Version.xcconfig':
-            continue
-        sensitive = (p in delta_paths or p.startswith(('.github/', 'gradle/', 'buildSrc/', 'scripts/'))
-                     or p in ('gradlew', 'gradlew.bat', 'gradle.properties', '.gitattributes', '.gitmodules')
-                     or p.endswith(('.gradle', '.gradle.kts', 'AndroidManifest.xml', '.aar', '.jar', '.so', '.c', '.cpp', '.h'))
-                     or re.search(r'/(player|updater|profiles)/', p)
-                     or re.search(r'(MainActivity|PlayerSettings|GenerateRuntimeConfig|AppFeaturePolicy|AppVersionConfig)', p))
-        if sensitive:
-            bad.append(p)
-    return bad
-
-
 def check_upstream(m, target):
     require(subprocess.run(['git', 'merge-base', '--is-ancestor', m['base_commit'], target], cwd=ROOT).returncode == 0,
             'Upstream history does not descend from the canonical baseline')
-    changed = git('diff', '--name-only', m['base_commit'], target).splitlines()
-    bad = unsafe_paths(changed, m['delta_paths'])
-    require(not bad, 'Upstream changes require Orientation review:\n' + '\n'.join(bad))
-    path = 'iosApp/Configuration/Version.xcconfig'
-    before = git('show', m['base_commit'] + ':' + path)
-    after = git('show', target + ':' + path)
-    strip = lambda s: re.sub(r'^(MARKETING_VERSION|CURRENT_PROJECT_VERSION)\s*=.*$', '', s, flags=re.M)
-    require(strip(before) == strip(after), 'Version configuration changed beyond version numbers')
+    rows = risk.review(ROOT, m['base_commit'], target, m['orientation_commit'])
+    report = {'base_tag': m['base_tag'], 'upstream_commit': target, 'changes': rows}
+    report_path = Path(os.environ.get('RUNNER_TEMP', '/tmp')) / 'orientation-risk.json'
+    report_path.write_text(json.dumps(report, indent=2) + '\n')
+    bad = [r for r in rows if r['risk'] == 'hard']
+    require(not bad, 'Semantic review required: ' + json.dumps(bad, indent=2))
+    return rows
+
+
+def reproduced_tree(m, target):
+    # An isolated index proves the complete tree, including every untouched upstream file.
+    with tempfile.TemporaryDirectory() as temporary:
+        env = os.environ.copy(); env['GIT_INDEX_FILE'] = str(Path(temporary) / 'index')
+        git('read-tree', target, env=env)
+        try:
+            git('apply', '--cached', '--3way', str(ROOT / 'orientation/canonical.patch'), env=env)
+        except subprocess.CalledProcessError as error:
+            details = error.output if isinstance(error.output, str) else 'Three-way patch conflict'
+            raise RuntimeError('Canonical integration conflict; manual review required:\n' + details) from error
+        return git('write-tree', env=env)
 
 
 def current_release(m):
@@ -136,26 +139,26 @@ def prepare(source, plan_path, baseline=False):
     v = selected['tag_name']
     git('fetch', '--no-tags', 'https://github.com/' + UPSTREAM + '.git', 'refs/tags/' + v)
     target = git('rev-parse', 'FETCH_HEAD^{commit}')
-    if baseline:
+    if v == m['base_tag']:
         require(target == m['base_commit'], 'Canonical upstream tag moved')
+    plan_path.write_text(json.dumps({'status':'preflight', 'version':v, 'upstream_commit':target, 'previous_commit':old_commit}, indent=2) + '\n')
     check_upstream(m, target)
     v_name, code = metadata(git('show', target + ':iosApp/Configuration/Version.xcconfig'))
     require(v == v_name and (baseline or code > old_code), 'Version does not match tag or cannot update installed app')
     require(not source.exists(), 'Candidate directory already exists')
-    git('worktree', 'add', '--detach', str(source), target)
-    git('apply', '--index', '--3way', str(ROOT / 'orientation/canonical.patch'), cwd=source)
-    require(git('diff', '--cached', '--name-only', cwd=source).splitlines() == m['delta_paths'], 'Unexpected integrated delta')
-    # Every original upstream file outside the reviewed delta remains exact.
-    env = os.environ.copy()
-    env.update(GIT_AUTHOR_NAME='Orientation automation', GIT_AUTHOR_EMAIL='orientation@users.noreply.github.com',
-               GIT_COMMITTER_NAME='Orientation automation', GIT_COMMITTER_EMAIL='orientation@users.noreply.github.com')
-    git('commit', '-m', f'Apply canonical Orientation delta to exact upstream {v}', cwd=source, env=env)
-    candidate = git('rev-parse', 'HEAD', cwd=source)
-    require(git('rev-parse', 'HEAD^', cwd=source) == target, 'Candidate is not based on exact upstream tag')
-    if baseline:
-        require(git('rev-parse', 'HEAD^{tree}', cwd=source) == git('rev-parse', m['orientation_commit'] + '^{tree}'),
+    tree = reproduced_tree(m, target)
+    if target == m['base_commit']:
+        require(tree == git('rev-parse', m['orientation_commit'] + '^{tree}'),
                 'Baseline replay did not reproduce the reviewed candidate tree')
-    plan = {'status': 'ready', 'baseline': baseline, 'version': v, 'version_code': code,
+        candidate = m['orientation_commit']
+    else:
+        env = os.environ.copy()
+        env.update(GIT_AUTHOR_NAME='Orientation automation', GIT_AUTHOR_EMAIL='orientation@users.noreply.github.com',
+                   GIT_COMMITTER_NAME='Orientation automation', GIT_COMMITTER_EMAIL='orientation@users.noreply.github.com')
+        candidate = git('commit-tree', tree, '-p', target, '-m', f'Apply canonical Orientation delta to exact upstream {v}', env=env)
+    git('worktree', 'add', '--detach', str(source), candidate)
+    require(git('rev-parse', 'HEAD^', cwd=source) == target, 'Candidate is not based on exact upstream tag')
+    plan = {'status': 'baseline-verified' if baseline else 'ready', 'baseline': baseline, 'version': v, 'version_code': code,
             'upstream_commit': target, 'commit': candidate, 'previous_commit': old_commit,
             'previous_version': old_version, 'patch_sha256': m['patch_sha256']}
     plan_path.write_text(json.dumps(plan, indent=2) + '\n')
@@ -171,13 +174,16 @@ def load_plan(source, path):
     require(not git('status', '--porcelain', '--untracked-files=no', cwd=source), 'Candidate tracked files changed')
     check_upstream(m, plan['upstream_commit'])
     require(git('diff', '--name-only', 'HEAD^', 'HEAD', cwd=source).splitlines() == m['delta_paths'], 'Candidate delta changed')
+    require(git('rev-parse', 'HEAD^{tree}', cwd=source) == reproduced_tree(m, plan['upstream_commit']),
+            'Candidate tree differs from exact upstream plus canonical patch')
     release.BUILDS[plan['version']] = (plan['commit'], plan['version_code'], plan['version'] + '-orientation')
     return plan
 
 
-def publish(source, plan_path, apk):
+def publish(source, plan_path, apk, evidence_path=None):
     plan = load_plan(source, plan_path)
     require(not plan['baseline'], 'Baseline dry run cannot publish')
+    evidence = tests.validate(evidence_path, plan)
     record = release.verify(source, plan['version'], apk)
     upstream = [r for r in stable(list_releases(UPSTREAM)) if r['tag_name'] == plan['version']]
     require(len(upstream) == 1, 'Upstream release was removed or is no longer stable')
@@ -191,7 +197,7 @@ def publish(source, plan_path, apk):
     # Upload tested source before publication, using a new immutable candidate branch.
     branch = 'orientation-candidates/' + plan['version'] + '-' + plan['commit'][:12]
     git('push', 'origin', plan['commit'] + ':refs/heads/' + branch)
-    release.publish(source, plan['version'], apk)
+    release.publish(source, plan['version'], apk, evidence=evidence)
     published = release.api('releases/tags/' + plan['version'] + '-orientation')
     # Publication has already verified the actual remote APK before making it visible.
     require(not published['draft'], 'Release was not published')
@@ -210,6 +216,10 @@ def report_failure():
     url = f"https://github.com/{REPO}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
     message = ('The automatic integration stopped. The previous working release is preserved. '
                'Inspect the failed gate and retained test reports: ' + url)
+    for name in ('orientation-plan.json', 'orientation-risk.json', 'orientation-reports/test-evidence.json'):
+        file = Path(os.environ.get('RUNNER_TEMP', '/tmp')) / name
+        if file.exists():
+            message += '\n\n' + name + '\n```json\n' + file.read_text() + '\n```'
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
             summary.write('## ' + title + '\n\n' + message + '\n')
@@ -231,6 +241,7 @@ def main():
     p.add_argument('--source', type=Path)
     p.add_argument('--plan', type=Path)
     p.add_argument('--apk', type=Path)
+    p.add_argument('--evidence', type=Path)
     p.add_argument('--baseline', action='store_true')
     a = p.parse_args()
     if a.action == 'report':
@@ -239,9 +250,10 @@ def main():
         prepare(a.source.resolve(), a.plan.resolve(), a.baseline)
     elif a.action == 'verify':
         plan = load_plan(a.source, a.plan)
+        tests.validate(a.evidence, plan)
         print(json.dumps(release.verify(a.source, plan['version'], a.apk), indent=2))
     else:
-        publish(a.source, a.plan, a.apk)
+        publish(a.source, a.plan, a.apk, a.evidence)
 
 
 if __name__ == '__main__':

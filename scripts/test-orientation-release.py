@@ -98,6 +98,26 @@ class ReleaseGateTest(unittest.TestCase):
                 release.publish(self.root, "0.4.15", self.apk)
             github.assert_not_called()
 
+    def test_remote_byte_mismatch_leaves_draft_unpublished(self):
+        commit = release.BUILDS['0.4.15'][0]
+        name = 'Nuvio-Enhanced-0.4.15-Orientation-Full-arm64-v8a.apk'
+        calls = []
+        def api(path, *args, **kwargs):
+            calls.append((path,args))
+            if path.startswith('git/ref'): return {'object':{'type':'commit','sha':commit}}
+            if path.startswith('releases/tags'): return {'id':1,'draft':True}
+            if path == 'releases/1': return {'id':1,'draft':True,'assets':[{'name':name,'state':'uploaded','size':self.apk.stat().st_size}]}
+            self.fail('Unexpected publication mutation')
+        original = self.command
+        def command(*args, **kwargs):
+            if args[:3] == ('gh','release','upload'): return ''
+            if args[:3] == ('gh','release','download'):
+                (Path(args[-1])/name).write_bytes(b'wrong remote bytes'); return ''
+            return original(*args,**kwargs)
+        with patch.object(release,'api',side_effect=api), patch.object(release,'run',side_effect=command):
+            with self.assertRaisesRegex(RuntimeError,'digest mismatch'): release.publish(self.root,'0.4.15',self.apk)
+        self.assertFalse(any('draft=false' in args for _,args in calls))
+
     def test_existing_source_tag_cannot_be_moved(self):
         with patch.object(release, "api", return_value={"object": {"type": "commit", "sha": "wrong"}}) as github:
             with self.assertRaisesRegex(RuntimeError, "Existing tag"):
