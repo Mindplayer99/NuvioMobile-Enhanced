@@ -1,17 +1,7 @@
-name: Integrate stable Enhanced releases into Orientation
+name: Release reviewed exact 0.4.16 Orientation
 on:
-  schedule:
-    - cron: '23 * * * *'
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: Check latest upstream, reproduce canonical baseline, or publish a safe update
-        type: choice
-        options: [dry-run, baseline, publish]
-        default: dry-run
   push:
-    branches: [ops/orientation-automation, enhanced]
-    paths: [orientation/**, scripts/orientation-*.py, scripts/test-orientation-*.py, .github/workflows/orientation-sync.yml]
+    branches: [ops/orientation-0416]
 
 permissions:
   contents: write
@@ -42,12 +32,13 @@ jobs:
         id: candidate
         env:
           GH_TOKEN: ${{ github.token }}
-          MODE: ${{ inputs.mode || (github.ref_name == 'ops/orientation-automation' && 'baseline') || (github.event_name == 'push' && 'dry-run') || 'publish' }}
+          MODE: publish
         run: |
           set -euo pipefail
           args=()
           if [[ "$MODE" == baseline ]]; then args+=(--baseline); fi
           python3 scripts/orientation-sync.py prepare --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" "${args[@]}"
+          jq -e '.status == "ready" and .version == "0.4.16" and .version_code == 121 and .upstream_commit == "fdc8d77a6594d4eeb5c2129b379dab85c2d2d8ac" and .commit == "a4b5f98a0f8ad82aa848ce426d7e87351deebc41"' "$RUNNER_TEMP/orientation-plan.json"
           echo "status=$(jq -r .status "$RUNNER_TEMP/orientation-plan.json")" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v5
         if: steps.candidate.outputs.status == 'ready'
@@ -58,6 +49,8 @@ jobs:
         if: steps.candidate.outputs.status == 'ready'
       - uses: gradle/actions/setup-gradle@v6
         if: steps.candidate.outputs.status == 'ready'
+        with:
+          cache-read-only: false
       - name: Install existing private release configuration
         if: steps.candidate.outputs.status == 'ready'
         env:
@@ -68,7 +61,7 @@ jobs:
         if: steps.candidate.outputs.status == 'ready'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/orientation-tests.py --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --report "$RUNNER_TEMP/orientation-reports"
+        run: python3 scripts/orientation-tests.py --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --report "$RUNNER_TEMP/orientation-reports" --upstream-run 34640006876
       - name: Verify signed APK against integration plan
         if: steps.candidate.outputs.status == 'ready'
         id: verified
@@ -79,7 +72,7 @@ jobs:
           python3 scripts/orientation-sync.py verify --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "${apks[0]}" --evidence "$RUNNER_TEMP/orientation-reports/test-evidence.json"
           echo "apk=${apks[0]}" >> "$GITHUB_OUTPUT"
       - name: Publish verified Orientation release
-        if: steps.candidate.outputs.status == 'ready' && github.ref_name == github.event.repository.default_branch && (github.event_name == 'schedule' || inputs.mode == 'publish')
+        if: steps.candidate.outputs.status == 'ready' && github.ref_name == 'ops/orientation-0416'
         env:
           GH_TOKEN: ${{ github.token }}
           APK: ${{ steps.verified.outputs.apk }}
@@ -100,7 +93,7 @@ jobs:
             ${{ runner.temp }}/orientation-source/composeApp/build/test-results/
           if-no-files-found: ignore
       - name: Record blocked automatic integration
-        if: failure() && github.ref_name == github.event.repository.default_branch && (github.event_name == 'schedule' || inputs.mode == 'publish')
+        if: failure() && github.ref_name == 'ops/orientation-0416'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/orientation-sync.py report

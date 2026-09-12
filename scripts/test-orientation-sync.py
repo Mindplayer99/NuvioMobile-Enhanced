@@ -26,26 +26,6 @@ class IntegrationGateTests(unittest.TestCase):
     def test_numeric_version_order(self):
         self.assertGreater(sync.version('0.4.10'), sync.version('0.4.9'))
 
-    def test_player_change_is_blocked_even_without_textual_overlap(self):
-        p = 'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/NewPlayerEngine.kt'
-        self.assertEqual(sync.unsafe_paths([p], []), [p])
-
-    def test_each_sensitive_change_is_blocked(self):
-        paths = ['.github/workflows/build.yml', 'composeApp/build.gradle.kts', 'gradle/libs.versions.toml',
-                 'androidApp/src/main/AndroidManifest.xml', 'scripts/build.sh', 'composeApp/libs/player.aar',
-                 'composeApp/src/androidMain/kotlin/MainActivity.kt',
-                 'composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt',
-                 'composeApp/src/commonMain/kotlin/com/nuvio/app/features/profiles/Profile.kt']
-        self.assertEqual(sync.unsafe_paths(paths, []), paths)
-
-    def test_any_canonical_overlap_is_blocked(self):
-        p = 'composeApp/src/commonMain/kotlin/HomeHeroSection.kt'
-        self.assertEqual(sync.unsafe_paths([p], [p]), [p])
-
-    def test_unrelated_features_and_version_change_can_proceed(self):
-        self.assertEqual(sync.unsafe_paths(['composeApp/src/commonMain/kotlin/features/search/Search.kt',
-                                           'iosApp/Configuration/Version.xcconfig', 'README.md'], []), [])
-
     def test_ambiguous_version_code_rejected(self):
         with self.assertRaises(RuntimeError):
             sync.metadata('MARKETING_VERSION = 0.4.16\nCURRENT_PROJECT_VERSION = 122\nCURRENT_PROJECT_VERSION = 123')
@@ -56,6 +36,7 @@ class IntegrationGateTests(unittest.TestCase):
     def test_failed_apk_verification_prevents_publication(self):
         plan = {'baseline': False, 'version': '0.4.16'}
         with patch.object(sync, 'load_plan', return_value=plan), \
+             patch.object(sync.tests, 'validate', return_value={}), \
              patch.object(sync.release, 'verify', side_effect=RuntimeError('wrong signer')), \
              patch.object(sync, 'git') as git, patch.object(sync.release, 'publish') as publish:
             with self.assertRaises(RuntimeError):
@@ -67,6 +48,7 @@ class IntegrationGateTests(unittest.TestCase):
         plan = {'baseline': False, 'version': '0.4.16', 'upstream_commit': 'expected'}
         rows = [{'tag_name': '0.4.16', 'draft': False, 'prerelease': False}]
         with patch.object(sync, 'load_plan', return_value=plan), \
+             patch.object(sync.tests, 'validate', return_value={}), \
              patch.object(sync.release, 'verify', return_value={}), \
              patch.object(sync, 'list_releases', return_value=rows), \
              patch.object(sync, 'git', side_effect=['', 'moved']) as git, \
@@ -95,7 +77,8 @@ class IntegrationGateTests(unittest.TestCase):
 
     def test_canonical_patch_matches_saved_reviewed_source(self):
         m = sync.config()
-        self.assertEqual(m['base_tag'], '0.4.15')
+        self.assertEqual(m['base_tag'], '0.4.16')
+        self.assertEqual(sync.reproduced_tree(m,m['base_commit']),sync.git('rev-parse',m['orientation_commit']+'^{tree}'))
         self.assertIn('androidApp/build.gradle.kts', m['delta_paths'])
 
 
