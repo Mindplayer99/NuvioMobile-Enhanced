@@ -16,7 +16,16 @@ private const val lockPlayerToLandscapeNotification = "NuvioPlayerLockLandscape"
 private const val unlockPlayerOrientationNotification = "NuvioPlayerUnlockOrientation"
 
 @Composable
-actual fun LockPlayerToLandscape() {
+actual fun rememberPlayerOrientationControl(
+    sessionKey: String,
+    settings: PlayerSettingsUiState,
+): (() -> Unit)? {
+    LockPlayerToLandscape()
+    return null
+}
+
+@Composable
+private fun LockPlayerToLandscape() {
     DisposableEffect(Unit) {
         NSNotificationCenter.defaultCenter.postNotificationName(
             lockPlayerToLandscapeNotification,

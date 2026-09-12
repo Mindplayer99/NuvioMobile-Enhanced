@@ -19,6 +19,9 @@ import platform.Foundation.NSUserDefaults
 actual object PlayerSettingsStorage {
     private const val showLoadingOverlayKey = "show_loading_overlay"
     private const val showParentalGuideKey = "show_parental_guide"
+    // Phone orientation is local to this device and profile, not cloud-synced.
+    private const val orientationPreferenceKey = "player_orientation_preference"
+    private const val lastPlayerOrientationKey = "last_player_orientation"
     private const val resizeModeKey = "resize_mode"
     private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
     private const val holdToSpeedValueKey = "hold_to_speed_value"
@@ -205,6 +208,26 @@ actual object PlayerSettingsStorage {
 
     actual fun saveShowParentalGuide(enabled: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(showParentalGuideKey))
+    }
+
+    actual fun loadOrientationPreference(): String? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(orientationPreferenceKey)
+        return defaults.stringForKey(key)
+    }
+
+    actual fun saveOrientationPreference(preference: String) {
+        NSUserDefaults.standardUserDefaults.setObject(preference, forKey = ProfileScopedKey.of(orientationPreferenceKey))
+    }
+
+    actual fun loadLastPlayerOrientation(): String? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(lastPlayerOrientationKey)
+        return defaults.stringForKey(key)
+    }
+
+    actual fun saveLastPlayerOrientation(orientation: String) {
+        NSUserDefaults.standardUserDefaults.setObject(orientation, forKey = ProfileScopedKey.of(lastPlayerOrientationKey))
     }
 
     actual fun loadResizeMode(): String? {

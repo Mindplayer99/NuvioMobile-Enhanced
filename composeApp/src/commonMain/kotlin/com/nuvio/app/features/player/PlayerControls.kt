@@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Tv
@@ -95,6 +98,7 @@ internal fun PlayerControlsShell(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onResizeModeClick: () -> Unit,
+    onRotateScreen: (() -> Unit)? = null,
     onSpeedClick: (() -> Unit)? = null,
     onSubtitleClick: (() -> Unit)? = null,
     onAudioClick: (() -> Unit)? = null,
@@ -170,6 +174,7 @@ internal fun PlayerControlsShell(
                 onVideoSettingsClick = onVideoSettingsClick,
                 onPictureInPictureClick = onPictureInPictureClick,
                 onInfoClick = onInfoClick,
+                onRotateScreen = onRotateScreen,
                 onOpenInExternalPlayer = onOpenInExternalPlayer,
                 onBack = onBack,
                 modifier = Modifier
@@ -217,6 +222,7 @@ internal fun PlayerControlsShell(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .padding(horizontal = metrics.horizontalPadding)
+                        .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Bottom))
                         .padding(bottom = metrics.sliderBottomOffset),
                 )
             }
@@ -224,6 +230,7 @@ internal fun PlayerControlsShell(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PlayerHeader(
     title: String,
@@ -243,6 +250,7 @@ private fun PlayerHeader(
     onVideoSettingsClick: (() -> Unit)?,
     onPictureInPictureClick: (() -> Unit)?,
     onInfoClick: (() -> Unit)?,
+    onRotateScreen: (() -> Unit)?,
     onOpenInExternalPlayer: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -254,13 +262,14 @@ private fun PlayerHeader(
         label = "playerHeaderMetadataAlpha",
     )
     Column(modifier = modifier) {
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
+            maxItemsInEachRow = if (metrics.compactControls) 1 else 2,
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
-                modifier = Modifier.weight(1f),
+                modifier = if (metrics.compactControls) Modifier.fillMaxWidth() else Modifier.weight(1f),
             ) {
                 Column(
                     modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
@@ -330,15 +339,19 @@ private fun PlayerHeader(
             }
 
             if (showActions) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                FlowRow(
+                    modifier = if (metrics.compactControls) Modifier.fillMaxWidth() else Modifier,
+                    horizontalArrangement = Arrangement.spacedBy(
+                        if (metrics.compactControls) 4.dp else 10.dp,
+                        Alignment.End,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     if (onSubmitIntroClick != null) {
                         PlayerHeaderIconButton(
                             icon = Icons.Rounded.Flag,
                             contentDescription = stringResource(Res.string.submit_intro_action),
-                            buttonSize = metrics.headerIconSize + 16.dp,
+                            buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onSubmitIntroClick,
                         )
@@ -347,7 +360,7 @@ private fun PlayerHeader(
                         PlayerHeaderIconButton(
                             icon = Icons.AutoMirrored.Rounded.OpenInNew,
                             contentDescription = stringResource(Res.string.streams_open_external_player),
-                            buttonSize = metrics.headerIconSize + 16.dp,
+                            buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onOpenInExternalPlayer,
                         )
@@ -359,7 +372,7 @@ private fun PlayerHeader(
                         } else {
                             stringResource(Res.string.compose_player_lock_controls)
                         },
-                        buttonSize = metrics.headerIconSize + 16.dp,
+                        buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                         iconSize = metrics.headerIconSize,
                         onClick = onLockToggle,
                     )
@@ -367,7 +380,7 @@ private fun PlayerHeader(
                         PlayerHeaderIconButton(
                             icon = Icons.Rounded.Build,
                             contentDescription = stringResource(Res.string.player_action_video_settings),
-                            buttonSize = metrics.headerIconSize + 16.dp,
+                            buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onVideoSettingsClick,
                         )
@@ -376,7 +389,7 @@ private fun PlayerHeader(
                         PlayerHeaderIconButton(
                             icon = Icons.Rounded.PictureInPictureAlt,
                             contentDescription = "Picture in Picture",
-                            buttonSize = metrics.headerIconSize + 16.dp,
+                            buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onPictureInPictureClick,
                         )
@@ -385,16 +398,25 @@ private fun PlayerHeader(
                         PlayerHeaderIconButton(
                             icon = Icons.Rounded.Info,
                             contentDescription = stringResource(Res.string.compose_player_playback_info),
-                            buttonSize = metrics.headerIconSize + 16.dp,
+                            buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onInfoClick,
+                        )
+                    }
+                    if (onRotateScreen != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.ScreenRotation,
+                            contentDescription = stringResource(Res.string.compose_player_rotate_screen),
+                            buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onRotateScreen,
                         )
                     }
                     NuvioBackButton(
                         onClick = onBack,
                         containerColor = Color.Black.copy(alpha = 0.35f),
                         contentColor = Color.White,
-                        buttonSize = metrics.headerIconSize + 16.dp,
+                        buttonSize = if (metrics.compactControls) 48.dp else metrics.headerIconSize + 16.dp,
                         iconSize = metrics.headerIconSize,
                         contentDescription = stringResource(Res.string.compose_player_close),
                     )
@@ -526,6 +548,7 @@ private fun PlayPauseControlButton(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProgressControls(
     playbackSnapshot: PlayerPlaybackSnapshot,
@@ -599,10 +622,10 @@ private fun ProgressControls(
                     shape = RoundedCornerShape(24.dp),
                 ),
             ) {
-                Row(
+                FlowRow(
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     PlayerActionPillButton(
                         label = stringResource(resizeMode.labelRes),
