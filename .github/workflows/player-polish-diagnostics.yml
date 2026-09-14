@@ -1,0 +1,30 @@
+name: Inspect player polish test evidence
+on:
+  push:
+    branches: [ops/player-polish-diagnostics]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Read failed test evidence
+        run: |
+          gh run download 34825325325 --repo Mindplayer99/NuvioMobile-Enhanced --name orientation-ui-polish-a4586ff64acae07d8b384ac4dae415becfc6e23d --dir evidence
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for p in Path('evidence').rglob('TEST-*PlayerPolishLayoutTest.xml'):
+              print('REPORT', p)
+              root=ET.parse(p).getroot()
+              for case in root.findall('testcase'):
+                  for f in case.findall('failure'):
+                      print('TEST',case.attrib)
+                      print('FAILURE',f.attrib)
+                      print((f.text or '')[:5000])
+          print('IMAGES', [str(p) for p in Path('evidence').rglob('*.png')])
+          PY
