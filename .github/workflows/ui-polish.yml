@@ -1,0 +1,62 @@
+name: Verify Orientation UI polish
+on:
+  push:
+    branches: [feature/orientation-ui-polish]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orientation-ui-polish
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'Mindplayer99/NuvioMobile-Enhanced'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: candidate
+          fetch-depth: 0
+          lfs: true
+      - uses: actions/checkout@v6
+        with:
+          ref: 530f4cb483f8d211ddd7c5365ca7c516a9b69ad0
+          path: baseline
+          lfs: true
+      - uses: actions/checkout@v6
+        with:
+          ref: 3799ecdd1cf2478c71fb0efd133e26236fc7ac5c
+          path: release-tools
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Configure existing signing identity
+        env:
+          NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+          NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: |
+          python3 release-tools/scripts/orientation-release.py configure --source candidate
+          python3 release-tools/scripts/orientation-release.py configure --source baseline
+      - name: UI interactions, baseline comparison and optimized Full ARM64 build
+        working-directory: candidate
+        run: python3 scripts/verify-ui-polish.py --baseline ../baseline --tools ../release-tools --report ../verification
+      - name: Retain APK, verification, screenshots and test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orientation-ui-polish-${{ github.sha }}
+          path: |
+            verification/
+            candidate/composeApp/build/reports/ui-polish/
+            candidate/composeApp/build/reports/tests/
+          if-no-files-found: error
+      - name: Remove private build configuration
+        if: always()
+        run: rm -f "$RUNNER_TEMP/orientation-release.jks" candidate/local.properties baseline/local.properties
