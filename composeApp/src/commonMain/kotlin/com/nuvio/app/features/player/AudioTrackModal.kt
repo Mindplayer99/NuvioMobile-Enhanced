@@ -160,8 +160,8 @@ private fun AudioTrackRow(
                 text = localizedTrackDisplayName(track.label, track.language, track.index),
                 color = primaryColor,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                // Preserve the complete codec, channels and role in long track labels.
+                softWrap = true,
             )
             track.language?.takeIf { it.isNotBlank() && it != "und" }?.let { language ->
                 Text(

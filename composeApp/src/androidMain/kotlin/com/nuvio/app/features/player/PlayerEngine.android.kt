@@ -1179,6 +1179,7 @@ private fun ExoPlayerSurface(
                 keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                 this.resizeMode = resizeMode.toExoResizeMode()
                 setShutterBackgroundColor(android.graphics.Color.BLACK)
+                installPortraitSubtitleViewport()
                 playerViewRef = this
                 sidecarController.bindSubtitleView(this.subtitleView)
                 syncLibassOverlay(
@@ -1480,11 +1481,13 @@ private fun LibmpvPlayerSurface(
                     InAppLogger.error("MPV/Android", "Failed to initialize libmpv: ${error.localizedMessage ?: error::class.simpleName.orEmpty()}")
                     latestOnError.value(error.localizedMessage ?: "libmpv unavailable")
                 }
+                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applySubtitleViewport() }
                 playerViewRef = this
             }
         },
         update = { view ->
             playerViewRef = view
+            view.applySubtitleViewport()
             view.applyResizeMode(resizeMode)
         },
         onRelease = { view ->
@@ -1835,6 +1838,20 @@ private class NuvioLibmpvView(
                     }
                 }.getOrDefault("unavailable")
             }
+        }
+    }
+
+    private var lastPortraitSubtitleViewport: Boolean? = null
+
+    fun applySubtitleViewport() {
+        if (width <= 0 || height <= 0) return
+        val portrait = height > width
+        if (lastPortraitSubtitleViewport == portrait) return
+        lastPortraitSubtitleViewport = portrait
+        executeMpv {
+            // Keep plain-text captions on the picture in portrait. Preserve landscape defaults
+            // and authored ASS positions; do not force ASS style overrides.
+            mpv.setPropertyBoolean("sub-use-margins", !portrait)
         }
     }
 

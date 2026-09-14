@@ -32,12 +32,15 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -124,6 +127,7 @@ fun SubtitleModal(
                 ?: SubtitleOffLanguageKey,
         )
     }
+    var compactPage by rememberSaveable(visible) { mutableStateOf("tracks") }
     var pendingOptionId by remember(visible) { mutableStateOf<String?>(playbackOptionId) }
     val options = remember(activeLanguageKey, subtitleStructureKey, addonStructureKey) {
         buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, addonSubtitles)
@@ -135,7 +139,7 @@ fun SubtitleModal(
     val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
         selectedOptionId != null && options.any { it.id == selectedOptionId }
 
-    LaunchedEffect(visible) {
+    LaunchedEffect(visible, compactPage, activeLanguageKey) {
         if (!visible) return@LaunchedEffect
         val languageIndex = languageItems.indexOfFirst { it.key == activeLanguageKey }
         if (languageIndex >= 0) {
@@ -203,59 +207,95 @@ fun SubtitleModal(
                     title = stringResource(Res.string.compose_player_subtitles),
                     onDismiss = onDismiss,
                 ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                    ) {
-                        item(key = "languages-heading") {
-                            CompactTrackSectionTitle(stringResource(Res.string.compose_player_languages))
-                        }
-                        items(languageItems, key = { "language:${it.key}" }) { item ->
-                            SubtitleLanguageRow(
-                                item = item,
-                                selected = item.key == activeLanguageKey,
-                                onClick = { selectLanguage(item) },
+                    // Navigation stays outside the scrolling content, regardless of track count.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = { compactPage = "languages" },
+                            modifier = Modifier.weight(1f).testTag("subtitle-language-picker"),
+                        ) {
+                            Text(
+                                text = when (activeLanguageKey) {
+                                    SubtitleOffLanguageKey -> stringResource(Res.string.compose_player_languages)
+                                    SubtitleUnknownLanguageKey -> stringResource(Res.string.subtitle_language_unknown)
+                                    else -> languageLabelForCode(activeLanguageKey)
+                                },
+                                maxLines = 2,
                             )
                         }
-                        item(key = "subtitles-heading") {
-                            CompactTrackSectionTitle(stringResource(Res.string.compose_player_subtitles))
-                        }
-                        if (options.isEmpty()) {
-                            item(key = "subtitles-empty") {
-                                SubtitleOptionsEmptyState(
-                                    activeLanguageKey = activeLanguageKey,
-                                    hasAvailableLanguages = languageItems.size > 1,
-                                    isLoadingAddonSubtitles = isLoadingAddonSubtitles,
-                                    onFetchAddonSubtitles = onFetchAddonSubtitles,
+                        TextButton(
+                            onClick = {
+                                languageItems.firstOrNull { it.key == SubtitleOffLanguageKey }?.let(selectLanguage)
+                                compactPage = "tracks"
+                            },
+                            modifier = Modifier.testTag("subtitle-off"),
+                        ) { Text(stringResource(Res.string.compose_player_none)) }
+                    }
+                    Row(Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { compactPage = "tracks" },
+                            modifier = Modifier.weight(1f).testTag("subtitle-tracks-tab"),
+                        ) { Text(stringResource(Res.string.compose_player_subtitles)) }
+                        TextButton(
+                            onClick = { compactPage = "style" },
+                            modifier = Modifier.weight(1f).testTag("subtitle-style-tab"),
+                        ) { Text(stringResource(Res.string.compose_player_style)) }
+                    }
+                    when (compactPage) {
+                        "languages" -> LazyColumn(
+                            state = languageListState,
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).testTag("subtitle-languages"),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                        ) {
+                            items(languageItems, key = { it.key }) { item ->
+                                SubtitleLanguageRow(
+                                    item = item,
+                                    selected = item.key == activeLanguageKey,
+                                    onClick = { selectLanguage(item); compactPage = "tracks" },
                                 )
                             }
                         }
-                        items(keyedOptions, key = { "option:${it.lazyKey}" }) { keyedOption ->
-                            val option = keyedOption.value
-                            SubtitleOptionRow(
-                                option = option,
-                                selected = option.id == selectedOptionId,
-                                onClick = { selectOption(option) },
+                        "style" -> Column(
+                            Modifier.fillMaxWidth().weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState()).testTag("subtitle-style"),
+                        ) {
+                            SubtitleStylePanel(
+                                style = subtitleStyle,
+                                subtitleDelayMs = subtitleDelayMs,
+                                selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
+                                subtitleAutoSyncState = subtitleAutoSyncState,
+                                isCompact = true,
+                                showHeader = false,
+                                onStyleChanged = onStyleChanged,
+                                onSubtitleDelayChanged = onSubtitleDelayChanged,
+                                onSubtitleDelayReset = onSubtitleDelayReset,
+                                onAutoSyncCapture = onAutoSyncCapture,
+                                onAutoSyncCueSelected = onAutoSyncCueSelected,
+                                onAutoSyncReload = onAutoSyncReload,
+                                wrapControls = true,
                             )
                         }
-                        if (styleVisible) {
-                            item(key = "style") {
-                                CompactTrackSectionTitle(stringResource(Res.string.compose_player_style))
-                                SubtitleStylePanel(
-                                    style = subtitleStyle,
-                                    subtitleDelayMs = subtitleDelayMs,
-                                    selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
-                                    subtitleAutoSyncState = subtitleAutoSyncState,
-                                    isCompact = true,
-                                    showHeader = false,
-                                    onStyleChanged = onStyleChanged,
-                                    onSubtitleDelayChanged = onSubtitleDelayChanged,
-                                    onSubtitleDelayReset = onSubtitleDelayReset,
-                                    onAutoSyncCapture = onAutoSyncCapture,
-                                    onAutoSyncCueSelected = onAutoSyncCueSelected,
-                                    onAutoSyncReload = onAutoSyncReload,
-                                    wrapControls = true,
+                        else -> LazyColumn(
+                            state = optionsListState,
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).testTag("subtitle-options"),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                        ) {
+                            if (options.isEmpty()) {
+                                item(key = "subtitles-empty") {
+                                    SubtitleOptionsEmptyState(
+                                        activeLanguageKey = activeLanguageKey,
+                                        hasAvailableLanguages = languageItems.size > 1,
+                                        isLoadingAddonSubtitles = isLoadingAddonSubtitles,
+                                        onFetchAddonSubtitles = onFetchAddonSubtitles,
+                                    )
+                                }
+                            }
+                            items(keyedOptions, key = { it.lazyKey }) { keyedOption ->
+                                val option = keyedOption.value
+                                SubtitleOptionRow(
+                                    option = option,
+                                    selected = option.id == selectedOptionId,
+                                    onClick = { selectOption(option) },
                                 )
                             }
                         }

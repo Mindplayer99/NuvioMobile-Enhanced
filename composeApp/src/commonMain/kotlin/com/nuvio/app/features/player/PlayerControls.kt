@@ -53,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -118,6 +119,7 @@ internal fun PlayerControlsShell(
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
+    onHeaderHeightChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -180,6 +182,7 @@ internal fun PlayerControlsShell(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
+                    .onSizeChanged { onHeaderHeightChanged(it.height) }
                     .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
                     .padding(
                         start = metrics.horizontalPadding,

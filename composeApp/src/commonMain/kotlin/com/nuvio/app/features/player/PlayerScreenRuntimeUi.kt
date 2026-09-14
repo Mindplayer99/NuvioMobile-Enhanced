@@ -11,6 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -26,6 +32,7 @@ import nuvio.composeapp.generated.resources.*
 @Composable
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Unit)? = null) {
     val runtime = this
+    var controlsHeaderHeight by remember { mutableStateOf(0.dp) }
     val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
     val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
     val currentGestureFeedback = liveGestureFeedback ?: gestureFeedback
@@ -293,11 +300,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Un
             )
         }
 
-        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen)
+        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it })
         RenderPlaybackOverlays(
             runtime = runtime,
             displayedPositionMs = displayedPositionMs,
             currentGestureFeedback = currentGestureFeedback,
+            controlsHeaderHeight = controlsHeaderHeight,
             p2pInitialLoadingMessage = p2pInitialLoadingMessage,
             p2pInitialLoadingProgress = p2pInitialLoadingProgress,
             showP2pRebufferStats = showP2pRebufferStats,
@@ -331,11 +339,13 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     displayedPositionMs: Long,
     isEpisode: Boolean,
     onRotateScreen: (() -> Unit)?,
+    onHeaderHeightChanged: (Dp) -> Unit,
 ) {
+    val density = LocalDensity.current
     val isInPip = rememberIsInPictureInPicture()
-    val compactTrackModalOpen = metrics.compactControls && (showAudioModal || showSubtitleModal)
+    val trackModalOpen = showAudioModal || showSubtitleModal
     AnimatedVisibility(
-        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !compactTrackModalOpen,
+        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !trackModalOpen,
         enter = fadeIn(),
         exit = fadeOut(),
     ) {
@@ -490,6 +500,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
                 scheduleProgressSyncAfterSeek()
             },
             horizontalSafePadding = horizontalSafePadding,
+            onHeaderHeightChanged = { height -> onHeaderHeightChanged(with(density) { height.toDp() }) },
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -500,6 +511,7 @@ private fun BoxScope.RenderPlaybackOverlays(
     runtime: PlayerScreenRuntime,
     displayedPositionMs: Long,
     currentGestureFeedback: GestureFeedbackState?,
+    controlsHeaderHeight: Dp,
     p2pInitialLoadingMessage: String?,
     p2pInitialLoadingProgress: Float?,
     showP2pRebufferStats: Boolean,
@@ -528,7 +540,8 @@ private fun BoxScope.RenderPlaybackOverlays(
         showP2pRebufferStats = showP2pRebufferStats,
         p2pRebufferMessage = p2pRebufferMessage,
         p2pRebufferProgress = p2pRebufferProgress,
-        currentGestureFeedback = currentGestureFeedback,
+        currentGestureFeedback = currentGestureFeedback.takeUnless { isAnyOverlayVisible },
+        controlsHeaderHeight = if (controlsVisible && !playerControlsLocked) controlsHeaderHeight else 0.dp,
         renderedGestureFeedback = renderedGestureFeedback,
         initialLoadCompleted = initialLoadCompleted,
         pausedOverlayVisible = pausedOverlayVisible,
