@@ -32,7 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvio
 import nuvio.composeapp.generated.resources.Res
-import nuvio.composeapp.generated.resources.compose_player_close
+import nuvio.composeapp.generated.resources.action_close
 import org.jetbrains.compose.resources.stringResource
 
 /** A bounded, opaque track sheet; the existing scaffold owns scrim taps and Back. */
@@ -68,7 +68,7 @@ internal fun CompactPlayerTrackSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, stringResource(Res.string.compose_player_close))
+                        Icon(Icons.Rounded.Close, stringResource(Res.string.action_close))
                     }
                 }
                 content()

@@ -139,18 +139,6 @@ fun SubtitleModal(
     val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
         selectedOptionId != null && options.any { it.id == selectedOptionId }
 
-    LaunchedEffect(visible, compactPage, activeLanguageKey) {
-        if (!visible) return@LaunchedEffect
-        val languageIndex = languageItems.indexOfFirst { it.key == activeLanguageKey }
-        if (languageIndex >= 0) {
-            languageListState.scrollItemIntoViewIfNeeded(languageIndex)
-        }
-        val optionId = selectedOptionId ?: return@LaunchedEffect
-        val optionIndex = options.indexOfFirst { it.id == optionId }
-        if (optionIndex >= 0) {
-            optionsListState.scrollItemIntoViewIfNeeded(optionIndex)
-        }
-    }
 
     LaunchedEffect(languageItems) {
         if (languageItems.none { it.key == activeLanguageKey }) {
@@ -196,6 +184,19 @@ fun SubtitleModal(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val compact = maxWidth < 600.dp
+        // Only scroll a list that is actually composed. Waiting on the hidden language
+        // list in portrait would suspend before the selected track could be revealed.
+        LaunchedEffect(visible, compact, compactPage, activeLanguageKey, selectedOptionId, options.size) {
+            if (!visible) return@LaunchedEffect
+            if (!compact || compactPage == "languages") {
+                val index = languageItems.indexOfFirst { it.key == activeLanguageKey }
+                if (index >= 0) languageListState.scrollItemIntoViewIfNeeded(index)
+            }
+            if (!compact || compactPage == "tracks") {
+                val index = options.indexOfFirst { it.id == selectedOptionId }
+                if (index >= 0) optionsListState.scrollItemIntoViewIfNeeded(index)
+            }
+        }
         PlayerOverlayScaffold(
             visible = visible,
             onDismiss = onDismiss,
