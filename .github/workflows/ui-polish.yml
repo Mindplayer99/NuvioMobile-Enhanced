@@ -47,6 +47,18 @@ jobs:
       - name: UI interactions, baseline comparison and optimized Full ARM64 build
         working-directory: candidate
         run: python3 scripts/verify-ui-polish.py --baseline ../baseline --tools ../release-tools --report ../verification
+      - name: Summarize failed focused tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for p in Path('verification').rglob('TEST-*.xml'):
+              root = ET.parse(p).getroot()
+              for case in root.findall('testcase'):
+                  for failure in case.findall('failure'):
+                      print(case.get('classname'), case.get('name'), failure.get('message'))
+          PY
       - name: Retain APK, verification, screenshots and test evidence
         if: always()
         uses: actions/upload-artifact@v7
