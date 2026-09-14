@@ -45,6 +45,7 @@ def main():
         'composeApp/src/commonMain/composeResources/values/strings.xml',
         'composeApp/src/commonMain/composeResources/values/search_polish.xml',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt',
+        'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOverlayScaffold.kt',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt',
