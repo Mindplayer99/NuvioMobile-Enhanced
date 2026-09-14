@@ -1,0 +1,14 @@
+name: Verify player polish delivery gates
+on:
+  push:
+    branches: [ops/ui-polish-player-delivery]
+permissions:
+  contents: read
+jobs:
+  verify-delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 -m py_compile scripts/publish-player-polish.py scripts/preserve-player-polish.py
+      - run: python3 scripts/test-player-polish-delivery.py
