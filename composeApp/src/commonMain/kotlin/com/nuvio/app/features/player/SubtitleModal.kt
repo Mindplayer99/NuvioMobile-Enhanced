@@ -32,12 +32,15 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -124,6 +127,7 @@ fun SubtitleModal(
                 ?: SubtitleOffLanguageKey,
         )
     }
+    var compactPage by rememberSaveable(visible) { mutableStateOf("tracks") }
     var pendingOptionId by remember(visible) { mutableStateOf<String?>(playbackOptionId) }
     val options = remember(activeLanguageKey, subtitleStructureKey, addonStructureKey) {
         buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, addonSubtitles)
@@ -135,18 +139,6 @@ fun SubtitleModal(
     val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
         selectedOptionId != null && options.any { it.id == selectedOptionId }
 
-    LaunchedEffect(visible) {
-        if (!visible) return@LaunchedEffect
-        val languageIndex = languageItems.indexOfFirst { it.key == activeLanguageKey }
-        if (languageIndex >= 0) {
-            languageListState.scrollItemIntoViewIfNeeded(languageIndex)
-        }
-        val optionId = selectedOptionId ?: return@LaunchedEffect
-        val optionIndex = options.indexOfFirst { it.id == optionId }
-        if (optionIndex >= 0) {
-            optionsListState.scrollItemIntoViewIfNeeded(optionIndex)
-        }
-    }
 
     LaunchedEffect(languageItems) {
         if (languageItems.none { it.key == activeLanguageKey }) {
@@ -163,160 +155,293 @@ fun SubtitleModal(
         }
     }
 
-    PlayerOverlayScaffold(
-        visible = visible,
-        onDismiss = onDismiss,
-        modifier = modifier,
-        contentPadding = PaddingValues(start = 52.dp, end = 52.dp, top = 36.dp, bottom = 76.dp),
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val railMaxHeight = (maxHeight - 72.dp).coerceAtLeast(120.dp)
+    val selectLanguage: (SubtitleLanguageItem) -> Unit = { item ->
+        activeLanguageKey = item.key
+        val availableOptions = buildSubtitleSelectionOptions(
+            item.key,
+            subtitleTracks,
+            addonSubtitles,
+        )
+        pendingOptionId = playbackOptionId?.takeIf { id ->
+            availableOptions.any { it.id == id }
+        }
+        if (item.key == SubtitleOffLanguageKey) {
+            onBuiltInTrackSelected(-1)
+        }
+    }
+    val selectOption: (SubtitleSelectionOption) -> Unit = { option ->
+        pendingOptionId = option.id
+        when (option) {
+            is SubtitleSelectionOption.BuiltIn -> {
+                onBuiltInTrackSelected(option.track.index)
+            }
 
-            Column(
-                modifier = Modifier.align(Alignment.BottomStart),
-                verticalArrangement = Arrangement.Bottom,
-            ) {
-                Text(
-                    text = stringResource(Res.string.compose_player_subtitles),
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
+            is SubtitleSelectionOption.Addon -> {
+                onAddonSubtitleSelected(option.subtitle)
+            }
+        }
+    }
 
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.Top,
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val compact = maxWidth < 600.dp
+        // Only scroll a list that is actually composed. Waiting on the hidden language
+        // list in portrait would suspend before the selected track could be revealed.
+        LaunchedEffect(visible, compact, compactPage, activeLanguageKey, selectedOptionId, options.size) {
+            if (!visible) return@LaunchedEffect
+            if (!compact || compactPage == "languages") {
+                val index = languageItems.indexOfFirst { it.key == activeLanguageKey }
+                if (index >= 0) languageListState.scrollItemIntoViewIfNeeded(index)
+            }
+            if (!compact || compactPage == "tracks") {
+                val index = options.indexOfFirst { it.id == selectedOptionId }
+                if (index >= 0) optionsListState.scrollItemIntoViewIfNeeded(index)
+            }
+        }
+        PlayerOverlayScaffold(
+            visible = visible,
+            onDismiss = onDismiss,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = if (compact) PaddingValues() else PaddingValues(start = 52.dp, end = 52.dp, top = 36.dp, bottom = 76.dp),
+        ) {
+            if (compact) {
+                CompactPlayerTrackSheet(
+                    title = stringResource(Res.string.compose_player_subtitles),
+                    onDismiss = onDismiss,
                 ) {
-                    SubtitleRail(
-                        title = stringResource(Res.string.compose_player_languages),
-                        width = 200.dp,
-                    ) {
-                        LazyColumn(
+                    // Navigation stays outside the scrolling content, regardless of track count.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = { compactPage = "languages" },
+                            modifier = Modifier.weight(1f).testTag("subtitle-language-picker"),
+                        ) {
+                            Text(
+                                text = when (activeLanguageKey) {
+                                    SubtitleOffLanguageKey -> stringResource(Res.string.compose_player_languages)
+                                    SubtitleUnknownLanguageKey -> stringResource(Res.string.subtitle_language_unknown)
+                                    else -> languageLabelForCode(activeLanguageKey)
+                                },
+                                maxLines = 2,
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                languageItems.firstOrNull { it.key == SubtitleOffLanguageKey }?.let(selectLanguage)
+                                compactPage = "tracks"
+                            },
+                            modifier = Modifier.testTag("subtitle-off"),
+                        ) { Text(stringResource(Res.string.compose_player_none)) }
+                    }
+                    Row(Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = { compactPage = "tracks" },
+                            modifier = Modifier.weight(1f).testTag("subtitle-tracks-tab"),
+                        ) { Text(stringResource(Res.string.compose_player_subtitles)) }
+                        TextButton(
+                            onClick = { compactPage = "style" },
+                            modifier = Modifier.weight(1f).testTag("subtitle-style-tab"),
+                        ) { Text(stringResource(Res.string.compose_player_style)) }
+                    }
+                    when (compactPage) {
+                        "languages" -> LazyColumn(
                             state = languageListState,
-                            modifier = Modifier.heightIn(max = railMaxHeight),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).testTag("subtitle-languages"),
                             contentPadding = PaddingValues(vertical = 8.dp),
                         ) {
                             items(languageItems, key = { it.key }) { item ->
                                 SubtitleLanguageRow(
                                     item = item,
                                     selected = item.key == activeLanguageKey,
-                                    onClick = {
-                                        activeLanguageKey = item.key
-                                        val availableOptions = buildSubtitleSelectionOptions(
-                                            item.key,
-                                            subtitleTracks,
-                                            addonSubtitles,
-                                        )
-                                        pendingOptionId = playbackOptionId?.takeIf { id ->
-                                            availableOptions.any { it.id == id }
-                                        }
-                                        if (item.key == SubtitleOffLanguageKey) {
-                                            onBuiltInTrackSelected(-1)
-                                        }
-                                    },
+                                    onClick = { selectLanguage(item); compactPage = "tracks" },
                                 )
                             }
                         }
-                    }
-
-                    SubtitleRail(
-                        title = stringResource(Res.string.compose_player_subtitles),
-                        width = 300.dp,
-                    ) {
-                        when {
-                            options.isEmpty() -> {
-                                when (
-                                    subtitleOptionsRailEmptyContent(
-                                        selectedLanguageKey = activeLanguageKey,
+                        "style" -> Column(
+                            Modifier.fillMaxWidth().weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState()).testTag("subtitle-style"),
+                        ) {
+                            SubtitleStylePanel(
+                                style = subtitleStyle,
+                                subtitleDelayMs = subtitleDelayMs,
+                                selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
+                                subtitleAutoSyncState = subtitleAutoSyncState,
+                                isCompact = true,
+                                showHeader = false,
+                                onStyleChanged = onStyleChanged,
+                                onSubtitleDelayChanged = onSubtitleDelayChanged,
+                                onSubtitleDelayReset = onSubtitleDelayReset,
+                                onAutoSyncCapture = onAutoSyncCapture,
+                                onAutoSyncCueSelected = onAutoSyncCueSelected,
+                                onAutoSyncReload = onAutoSyncReload,
+                                wrapControls = true,
+                            )
+                        }
+                        else -> LazyColumn(
+                            state = optionsListState,
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).testTag("subtitle-options"),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                        ) {
+                            if (options.isEmpty()) {
+                                item(key = "subtitles-empty") {
+                                    SubtitleOptionsEmptyState(
+                                        activeLanguageKey = activeLanguageKey,
                                         hasAvailableLanguages = languageItems.size > 1,
                                         isLoadingAddonSubtitles = isLoadingAddonSubtitles,
+                                        onFetchAddonSubtitles = onFetchAddonSubtitles,
                                     )
-                                ) {
-                                    SubtitleOptionsRailEmptyContent.NONE -> {
-                                        SubtitleRailEmptyState(
-                                            text = stringResource(Res.string.compose_player_none),
-                                        )
-                                    }
-
-                                    SubtitleOptionsRailEmptyContent.LOADING -> {
-                                        PlayerModalLoading(modifier = Modifier.padding(vertical = 24.dp))
-                                    }
-
-                                    SubtitleOptionsRailEmptyContent.FETCH -> {
-                                        SubtitleRailEmptyState(
-                                            text = stringResource(Res.string.compose_player_fetch_subtitles),
-                                            onClick = onFetchAddonSubtitles,
-                                        )
-                                    }
                                 }
                             }
-
-                            else -> {
-                                LazyColumn(
-                                    state = optionsListState,
-                                    modifier = Modifier.heightIn(max = railMaxHeight),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    contentPadding = PaddingValues(vertical = 8.dp),
-                                ) {
-                                    items(keyedOptions, key = { it.lazyKey }) { keyedOption ->
-                                        val option = keyedOption.value
-                                        SubtitleOptionRow(
-                                            option = option,
-                                            selected = option.id == selectedOptionId,
-                                            onClick = {
-                                                pendingOptionId = option.id
-                                                when (option) {
-                                                    is SubtitleSelectionOption.BuiltIn -> {
-                                                        onBuiltInTrackSelected(option.track.index)
-                                                    }
-
-                                                    is SubtitleSelectionOption.Addon -> {
-                                                        onAddonSubtitleSelected(option.subtitle)
-                                                    }
-                                                }
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = styleVisible,
-                        enter = fadeIn(),
-                        exit = fadeOut(),
-                    ) {
-                        SubtitleRail(
-                            title = stringResource(Res.string.compose_player_style),
-                            width = 280.dp,
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .heightIn(max = railMaxHeight)
-                                    .verticalScroll(rememberScrollState()),
-                            ) {
-                                SubtitleStylePanel(
-                                    style = subtitleStyle,
-                                    subtitleDelayMs = subtitleDelayMs,
-                                    selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
-                                    subtitleAutoSyncState = subtitleAutoSyncState,
-                                    isCompact = railMaxHeight < 420.dp,
-                                    showHeader = false,
-                                    onStyleChanged = onStyleChanged,
-                                    onSubtitleDelayChanged = onSubtitleDelayChanged,
-                                    onSubtitleDelayReset = onSubtitleDelayReset,
-                                    onAutoSyncCapture = onAutoSyncCapture,
-                                    onAutoSyncCueSelected = onAutoSyncCueSelected,
-                                    onAutoSyncReload = onAutoSyncReload,
+                            items(keyedOptions, key = { it.lazyKey }) { keyedOption ->
+                                val option = keyedOption.value
+                                SubtitleOptionRow(
+                                    option = option,
+                                    selected = option.id == selectedOptionId,
+                                    onClick = { selectOption(option) },
                                 )
                             }
                         }
                     }
                 }
+            } else BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val railMaxHeight = (maxHeight - 72.dp).coerceAtLeast(120.dp)
+
+                Column(
+                    modifier = Modifier.align(Alignment.BottomStart),
+                    verticalArrangement = Arrangement.Bottom,
+                ) {
+                    Text(
+                        text = stringResource(Res.string.compose_player_subtitles),
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        SubtitleRail(
+                            title = stringResource(Res.string.compose_player_languages),
+                            width = 200.dp,
+                        ) {
+                            LazyColumn(
+                                state = languageListState,
+                                modifier = Modifier.heightIn(max = railMaxHeight),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                contentPadding = PaddingValues(vertical = 8.dp),
+                            ) {
+                                items(languageItems, key = { it.key }) { item ->
+                                    SubtitleLanguageRow(
+                                        item = item,
+                                        selected = item.key == activeLanguageKey,
+                                        onClick = { selectLanguage(item) },
+                                    )
+                                }
+                            }
+                        }
+
+                        SubtitleRail(
+                            title = stringResource(Res.string.compose_player_subtitles),
+                            width = 300.dp,
+                        ) {
+                            when {
+                                options.isEmpty() -> {
+                                    SubtitleOptionsEmptyState(
+                                        activeLanguageKey = activeLanguageKey,
+                                        hasAvailableLanguages = languageItems.size > 1,
+                                        isLoadingAddonSubtitles = isLoadingAddonSubtitles,
+                                        onFetchAddonSubtitles = onFetchAddonSubtitles,
+                                    )
+                                }
+
+                                else -> {
+                                    LazyColumn(
+                                        state = optionsListState,
+                                        modifier = Modifier.heightIn(max = railMaxHeight),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                        contentPadding = PaddingValues(vertical = 8.dp),
+                                    ) {
+                                        items(keyedOptions, key = { it.lazyKey }) { keyedOption ->
+                                            val option = keyedOption.value
+                                            SubtitleOptionRow(
+                                                option = option,
+                                                selected = option.id == selectedOptionId,
+                                                onClick = { selectOption(option) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = styleVisible,
+                            enter = fadeIn(),
+                            exit = fadeOut(),
+                        ) {
+                            SubtitleRail(
+                                title = stringResource(Res.string.compose_player_style),
+                                width = 280.dp,
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .heightIn(max = railMaxHeight)
+                                        .verticalScroll(rememberScrollState()),
+                                ) {
+                                    SubtitleStylePanel(
+                                        style = subtitleStyle,
+                                        subtitleDelayMs = subtitleDelayMs,
+                                        selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
+                                        subtitleAutoSyncState = subtitleAutoSyncState,
+                                        isCompact = railMaxHeight < 420.dp,
+                                        showHeader = false,
+                                        onStyleChanged = onStyleChanged,
+                                        onSubtitleDelayChanged = onSubtitleDelayChanged,
+                                        onSubtitleDelayReset = onSubtitleDelayReset,
+                                        onAutoSyncCapture = onAutoSyncCapture,
+                                        onAutoSyncCueSelected = onAutoSyncCueSelected,
+                                        onAutoSyncReload = onAutoSyncReload,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SubtitleOptionsEmptyState(
+    activeLanguageKey: String,
+    hasAvailableLanguages: Boolean,
+    isLoadingAddonSubtitles: Boolean,
+    onFetchAddonSubtitles: () -> Unit,
+) {
+    when (
+        subtitleOptionsRailEmptyContent(
+            selectedLanguageKey = activeLanguageKey,
+            hasAvailableLanguages = hasAvailableLanguages,
+            isLoadingAddonSubtitles = isLoadingAddonSubtitles,
+        )
+    ) {
+        SubtitleOptionsRailEmptyContent.NONE -> {
+            SubtitleRailEmptyState(
+                text = stringResource(Res.string.compose_player_none),
+            )
+        }
+
+        SubtitleOptionsRailEmptyContent.LOADING -> {
+            PlayerModalLoading(modifier = Modifier.padding(vertical = 24.dp))
+        }
+
+        SubtitleOptionsRailEmptyContent.FETCH -> {
+            SubtitleRailEmptyState(
+                text = stringResource(Res.string.compose_player_fetch_subtitles),
+                onClick = onFetchAddonSubtitles,
+            )
         }
     }
 }
@@ -531,8 +656,11 @@ private fun SubtitleRailEmptyState(
         }
         Text(
             text = text,
+            modifier = Modifier.weight(1f),
             color = tokens.colors.textMuted,
             style = MaterialTheme.typography.bodyLarge,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

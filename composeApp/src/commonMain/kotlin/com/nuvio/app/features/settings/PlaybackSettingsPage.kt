@@ -66,6 +66,7 @@ import com.nuvio.app.features.player.localizedLabel
 import com.nuvio.app.features.player.IosTargetPrimaries
 import com.nuvio.app.features.player.IosTargetTransfer
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.PlayerOrientationPreference
 import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
 import com.nuvio.app.features.player.SubtitleBackgroundColorSwatches
 import com.nuvio.app.features.player.SubtitleColorSwatches
@@ -299,6 +300,7 @@ private fun PlaybackSettingsSection(
     useLibass: Boolean,
     libassRenderType: String,
 ) {
+    var showPlayerOrientationDialog by remember { mutableStateOf(false) }
     var showPreferredAudioDialog by remember { mutableStateOf(false) }
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
     var showPreferredSubtitleDialog by remember { mutableStateOf(false) }
@@ -375,6 +377,15 @@ private fun PlaybackSettingsSection(
                     onCheckedChange = PlayerSettingsRepository::setShowParentalGuide,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                if (!isIos) {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_player_orientation),
+                        description = stringResource(autoPlayPlayerSettings.orientationPreference.labelRes),
+                        isTablet = isTablet,
+                        onClick = { showPlayerOrientationDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                }
                 // Player preference picker: Internal / External
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_player_preference),
@@ -1295,6 +1306,21 @@ private fun PlaybackSettingsSection(
                 }
             }
         }
+    }
+
+    if (showPlayerOrientationDialog) {
+        IosEnumSelectionDialog(
+            title = stringResource(Res.string.settings_player_orientation),
+            options = PlayerOrientationPreference.entries.toList(),
+            selected = autoPlayPlayerSettings.orientationPreference,
+            label = { stringResource(it.labelRes) },
+            description = { stringResource(it.descriptionRes) },
+            onSelect = {
+                PlayerSettingsRepository.setOrientationPreference(it)
+                showPlayerOrientationDialog = false
+            },
+            onDismiss = { showPlayerOrientationDialog = false },
+        )
     }
 
     if (showPreferredAudioDialog) {
@@ -3665,3 +3691,19 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
 
 @Composable
 private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
+
+private val PlayerOrientationPreference.labelRes: StringResource
+    get() = when (this) {
+        PlayerOrientationPreference.RememberLastUsed -> Res.string.settings_player_orientation_remember
+        PlayerOrientationPreference.AlwaysLandscape -> Res.string.settings_player_orientation_landscape
+        PlayerOrientationPreference.AlwaysPortrait -> Res.string.settings_player_orientation_portrait
+        PlayerOrientationPreference.FollowDevice -> Res.string.settings_player_orientation_device
+    }
+
+private val PlayerOrientationPreference.descriptionRes: StringResource
+    get() = when (this) {
+        PlayerOrientationPreference.RememberLastUsed -> Res.string.settings_player_orientation_remember_description
+        PlayerOrientationPreference.AlwaysLandscape -> Res.string.settings_player_orientation_landscape_description
+        PlayerOrientationPreference.AlwaysPortrait -> Res.string.settings_player_orientation_portrait_description
+        PlayerOrientationPreference.FollowDevice -> Res.string.settings_player_orientation_device_description
+    }

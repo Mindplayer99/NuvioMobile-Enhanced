@@ -43,6 +43,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     p2pRebufferMessage: String?,
     p2pRebufferProgress: Float?,
     currentGestureFeedback: GestureFeedbackState?,
+    controlsHeaderHeight: Dp = 0.dp,
     renderedGestureFeedback: GestureFeedbackState?,
     initialLoadCompleted: Boolean,
     pausedOverlayVisible: Boolean,
@@ -106,26 +107,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             .padding(top = 58.dp),
     )
 
-    AnimatedVisibility(
-        visible = currentGestureFeedback != null,
-        enter = fadeIn(),
-        exit = fadeOut(),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            renderedGestureFeedback?.let { feedback ->
-                GestureFeedbackPill(
-                    feedback = feedback,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
-                        .padding(horizontal = horizontalSafePadding)
-                        .padding(top = 40.dp),
-                )
-            }
-        }
-    }
+    PlayerGestureFeedbackOverlay(currentGestureFeedback, renderedGestureFeedback, horizontalSafePadding, controlsHeaderHeight)
 
     if (!playerControlsLocked) {
         SkipIntroButton(
@@ -164,4 +146,34 @@ internal fun BoxScope.PlayerPlaybackOverlays(
             onDismiss = onDismissError,
         )
     }
+}
+
+@Composable
+internal fun PlayerGestureFeedbackOverlay(
+    currentGestureFeedback: GestureFeedbackState?,
+    renderedGestureFeedback: GestureFeedbackState?,
+    horizontalSafePadding: Dp,
+    controlsHeaderHeight: Dp,
+) {
+    AnimatedVisibility(
+        visible = currentGestureFeedback != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            renderedGestureFeedback?.let { feedback ->
+                GestureFeedbackPill(
+                    feedback = feedback,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
+                        .padding(horizontal = horizontalSafePadding)
+                        .padding(top = maxOf(40.dp, controlsHeaderHeight + 8.dp)),
+                )
+            }
+        }
+    }
+
 }

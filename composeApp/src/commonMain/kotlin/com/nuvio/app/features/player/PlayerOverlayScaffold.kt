@@ -39,17 +39,16 @@ internal fun PlayerOverlayScaffold(
         val interactionSource = remember { MutableInteractionSource() }
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onDismiss,
-                ),
+            modifier = Modifier.fillMaxSize(),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onDismiss,
+                    )
                     .drawWithCache {
                         val horizontalGradient = Brush.horizontalGradient(
                             listOf(Color.Black.copy(alpha = 0.88f), Color.Transparent),
@@ -68,7 +67,12 @@ internal fun PlayerOverlayScaffold(
                             drawRect(verticalGradient)
                         }
                     }
-                    .padding(contentPadding),
+                ,
+            )
+            // Keep dismissal on a sibling scrim so its click semantics cannot swallow
+            // track/style content or make the whole sheet a single accessibility node.
+            Box(
+                modifier = Modifier.fillMaxSize().padding(contentPadding),
                 content = content,
             )
         }

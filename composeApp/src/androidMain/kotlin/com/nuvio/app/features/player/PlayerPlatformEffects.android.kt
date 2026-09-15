@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.media.AudioManager
 import androidx.activity.ComponentActivity
 import android.os.Build
@@ -12,6 +13,9 @@ import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.app.MultiWindowModeChangedInfo
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,18 +30,77 @@ import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.math.roundToInt
 
 @Composable
-actual fun LockPlayerToLandscape() {
-    val activity = LocalContext.current.findActivity() ?: return
-    if (!activity.shouldForceLandscapePlayer()) return
+actual fun rememberPlayerOrientationControl(
+    sessionKey: String,
+    settings: PlayerSettingsUiState,
+): (() -> Unit)? {
+    val activity = LocalContext.current.findActivity() ?: return null
+    val configuration = LocalConfiguration.current
+    val componentActivity = activity as? ComponentActivity
+    val isInPip = rememberIsInPictureInPicture()
+    var isInMultiWindow by remember(activity) { mutableStateOf(activity.isInMultiWindowMode) }
+    var overrideName by rememberSaveable(sessionKey, settings.orientationPreference) {
+        mutableStateOf<String?>(null)
+    }
+    val session = PlayerOrientationSession(
+        preference = settings.orientationPreference,
+        lastUsed = settings.lastPlayerOrientation,
+        sessionOverride = overrideName?.let(PlayerOrientation::fromStored),
+    )
+    val previousOrientation = remember(activity) { activity.requestedOrientation }
+    val isTablet = configuration.smallestScreenWidthDp >= 600
 
     DisposableEffect(activity) {
-        val previousOrientation = activity.requestedOrientation
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-
+        val listener = Consumer<MultiWindowModeChangedInfo> { info ->
+            isInMultiWindow = info.isInMultiWindowMode
+        }
+        componentActivity?.addOnMultiWindowModeChangedListener(listener)
         onDispose {
-            activity.requestedOrientation = previousOrientation
+            componentActivity?.removeOnMultiWindowModeChangedListener(listener)
+            if (activity.requestedOrientation != previousOrientation) {
+                activity.requestedOrientation = previousOrientation
+            }
         }
     }
+
+    SideEffect {
+        // PiP must keep its video-driven aspect ratio. Reapply the session on returning.
+        if (!activity.isInPictureInPictureMode) {
+            val target = if (isTablet || activity.isInMultiWindowMode) {
+                // Release our phone lock when Android takes ownership of the window.
+                previousOrientation
+            } else {
+                session.requested.toAndroidRequestedOrientation()
+            }
+            if (activity.requestedOrientation != target) activity.requestedOrientation = target
+        }
+    }
+
+    if (isTablet || isInMultiWindow || isInPip) return null
+    return {
+        // Recheck live window state: a tap can race with a multi-window/PiP callback.
+        if (!activity.isInMultiWindowMode && !activity.isInPictureInPictureMode &&
+            activity.resources.configuration.smallestScreenWidthDp < 600
+        ) {
+            val displayed = if (activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                PlayerOrientation.Portrait
+            } else {
+                PlayerOrientation.Landscape
+            }
+            // Read the latest override so rapid taps toggle the pending request too.
+            val rotated = session.copy(
+                sessionOverride = overrideName?.let(PlayerOrientation::fromStored),
+            ).rotate(displayed)
+            overrideName = rotated.sessionOverride?.name
+            rotated.orientationToRemember?.let(PlayerSettingsRepository::rememberPlayerOrientation)
+        }
+    }
+}
+
+internal fun PlayerOrientation?.toAndroidRequestedOrientation(): Int = when (this) {
+    PlayerOrientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    PlayerOrientation.Portrait -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    null -> ActivityInfo.SCREEN_ORIENTATION_USER
 }
 
 @Composable
@@ -130,12 +193,6 @@ private tailrec fun Context.findActivity(): Activity? =
         is ContextWrapper -> baseContext.findActivity()
         else -> null
     }
-
-private fun Activity.shouldForceLandscapePlayer(): Boolean {
-    if (resources.configuration.smallestScreenWidthDp >= 600) return false
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode) return false
-    return true
-}
 
 private class AndroidPlayerGestureController(
     private val activity: Activity,
