@@ -47,8 +47,7 @@ class PortraitSubtitleViewportTest {
             view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
             view.layout(0, 0, width, height)
-            val changed = view.alignPortraitSubtitleViewport()
-            if (!changed) stable = true
+            stable = !view.viewTreeObserver.dispatchOnPreDraw()
         }
         assertTrue(stable, "Caption layout must converge without a redraw loop")
     }
@@ -91,7 +90,7 @@ class PortraitSubtitleViewportTest {
         assertDrawnInside(view, frame.top, frame.bottom, "caption-nested-fit")
     }
 
-    @Test fun explicitTextCuesStayVisibleThroughFitZoomAndRotation() {
+    @Test fun captionsFollowVideoBoundsAndRestoreLandscapeWithoutRecreatingView() {
         val view = player(); text(view, true)
         layout(view, 400, 900)
         view.updatePortraitCaptionBottomInset(180)
@@ -122,12 +121,19 @@ class PortraitSubtitleViewportTest {
         assertDrawnInside(view, 0, 720, "caption-zoom-bitmap")
     }
 
-    @Test fun fillAndShortWindowHaveUsableCaptionBounds() {
+    @Test fun croppedAndUnknownVideoBoundsNeverCreateNegativeCaptionHeight() {
         val view = player(); text(view)
         view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
         view.updatePortraitCaptionBottomInset(400)
         layout(view, 320, 480)
         assertTrue(view.subtitleView!!.height > 0)
         assertDrawnInside(view, 0, 240, "caption-short-fill")
+        view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        layout(view, 400, 900)
+        assertTrue(view.subtitleView!!.height > 0)
+        view.findViewById<AspectRatioFrameLayout>(R.id.exo_content_frame).setAspectRatio(0f)
+        layout(view, 400, 900)
+        assertTrue(view.subtitleView!!.height > 0)
+        assertDrawnInside(view, 0, 500, "caption-unknown-aspect")
     }
 }
