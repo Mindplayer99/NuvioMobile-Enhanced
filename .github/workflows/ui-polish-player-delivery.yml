@@ -1,14 +1,51 @@
-name: Verify player polish delivery gates
+name: Deliver verified player and Search polish
 on:
   push:
     branches: [ops/ui-polish-player-delivery]
 permissions:
-  contents: read
+  contents: write
+  actions: read
+concurrency:
+  group: orientation-releases
+  cancel-in-progress: false
+env:
+  GH_TOKEN: ${{ github.token }}
+  VERIFIED_SOURCE_SHA: c9d91d761ad49f3d482bde3e42de8eab2470bbaf
+  VERIFIED_RUN_ID: '34857502906'
 jobs:
-  verify-delivery:
+  deliver:
+    if: github.repository == 'Mindplayer99/NuvioMobile-Enhanced'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
-      - run: python3 -m py_compile scripts/publish-player-polish.py scripts/preserve-player-polish.py
-      - run: python3 scripts/test-player-polish-delivery.py
+      - uses: actions/checkout@v6
+        with:
+          ref: c9d91d761ad49f3d482bde3e42de8eab2470bbaf
+          path: candidate
+      - uses: actions/checkout@v6
+        with:
+          ref: 3799ecdd1cf2478c71fb0efd133e26236fc7ac5c
+          path: release-tools
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Verify publication rejection gates
+        run: python3 scripts/test-player-polish-delivery.py
+      - name: Publish only after remote APK verification
+        run: python3 scripts/publish-player-polish.py
+      - name: Preserve verified runtime in canonical automation
+        run: python3 scripts/preserve-player-polish.py
+      - name: Retain canonical and future integration evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: player-polish-delivery-evidence
+          path: |
+            ${{ runner.temp }}/ui-canonical-plan.json
+            ${{ runner.temp }}/ui-future-plan.json
+            ${{ runner.temp }}/orientation-risk.json
+          if-no-files-found: ignore
