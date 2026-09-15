@@ -52,6 +52,10 @@ def main():
     Path('orientation/manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     p=Path('scripts/test-orientation-sync.py')
     p.write_text(p.read_text().replace("self.assertEqual(m['base_tag'], '0.4.16')","self.assertEqual(m['base_tag'], '0.4.17')"))
+    workflow = Path('.github/workflows/orientation-sync.yml')
+    workflow.write_text(workflow.read_text().replace(
+        '      - uses: android-actions/setup-android@v3\n',
+        "      - uses: android-actions/setup-android@v3\n        with:\n          packages: 'platform-tools build-tools;36.0.0'\n          log-accepted-android-sdk-licenses: false\n"))
     for script in ['test-orientation-release.py','test-orientation-sync.py','test-orientation-risk.py','test-orientation-tests.py']:
         subprocess.check_call(['python3','scripts/'+script])
     # Baseline must reproduce the exact reviewed runtime, with numeric upstream metadata.
@@ -71,7 +75,7 @@ def main():
     require(future.returncode == 0 or hard, 'Future dry-run failed for an unexplained reason')
     print('FUTURE_UPSTREAM_HARD_BLOCKS',json.dumps([dict(path=r['path'],reasons=r['reasons']) for r in hard]))
     git('push','origin',canonical+':refs/heads/orientation-canonical/0.4.17-ui2')
-    git('add','orientation/manifest.json','orientation/canonical.patch','scripts/test-orientation-sync.py')
+    git('add','orientation/manifest.json','orientation/canonical.patch','scripts/test-orientation-sync.py','.github/workflows/orientation-sync.yml')
     git('commit','-m','Preserve verified player and Search polish in 0.4.17 canonical baseline')
     new_head=git('rev-parse','HEAD')
     # The same release concurrency group guards this workflow and hourly integration.
