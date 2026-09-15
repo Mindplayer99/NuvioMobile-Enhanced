@@ -226,6 +226,7 @@ fun SubtitleModal(
                     ) {
                         OutlinedButton(
                             onClick = { compactPage = "languages" },
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp).testTag("subtitle-language-picker"),
                         ) {
                             Text(
@@ -235,6 +236,7 @@ fun SubtitleModal(
                                     else -> languageLabelForCode(activeLanguageKey)
                                 },
                                 modifier = Modifier.weight(1f),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 maxLines = 2,
                             )
                             Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
@@ -246,7 +248,12 @@ fun SubtitleModal(
                                 compactPage = "tracks"
                             },
                             modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp).testTag("subtitle-off"),
-                            label = { Text(stringResource(Res.string.compose_action_off)) },
+                            shape = RoundedCornerShape(16.dp),
+                            label = {
+                                Text(stringResource(Res.string.compose_action_off),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            },
                         )
                     }
                     TabRow(

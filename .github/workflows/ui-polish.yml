@@ -9,7 +9,7 @@ permissions:
 
 concurrency:
   group: orientation-ui-polish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   verify:
