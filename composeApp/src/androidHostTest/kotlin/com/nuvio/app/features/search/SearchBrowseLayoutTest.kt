@@ -3,6 +3,8 @@ package com.nuvio.app.features.search
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +43,8 @@ class SearchBrowseLayoutTest {
     @get:Rule val compose = createComposeRule()
     private val history = mutableStateOf((1..10).map { "Query $it" })
     private var selected: String? = null
+    private val query = mutableStateOf("")
+    private val focused = mutableStateOf(false)
 
     @Composable
     private fun Browse(fontScale: Float = 1f) {
@@ -49,8 +53,13 @@ class SearchBrowseLayoutTest {
                 LocalDensity provides Density(LocalDensity.current.density, fontScale),
                 LocalNuvioBottomNavigationOverlayPadding provides 80.dp,
             ) {
+                val listState = rememberLazyListState()
+                Column(Modifier.fillMaxSize()) {
+                SearchContextHeader(listState, query.value, focused.value, history.value.isNotEmpty(),
+                    Modifier.testTag("search-context-title"))
                 NuvioScreen(
-                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag("browse"),
+                    listState = listState,
+                    modifier = Modifier.weight(1f).background(MaterialTheme.colorScheme.background).testTag("browse"),
                     horizontalPadding = 0.dp,
                     topPadding = 0.dp,
                 ) {
@@ -75,6 +84,42 @@ class SearchBrowseLayoutTest {
                 }
             }
         }
+    }
+
+    }
+
+    @Test fun headingFollowsDiscoverAndReturnsForFocusQueryAndScrollBack() {
+        compose.setContent { Browse() }
+        fun title(value: String) {
+            compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText(value)))
+        }
+        title("Search")
+        compose.onNodeWithTag("browse").performScrollToIndex(5)
+        title("Discover")
+        compose.runOnIdle { focused.value = true }
+        title("Search")
+        compose.runOnIdle { focused.value = false; query.value = "movie" }
+        title("Search")
+        compose.runOnIdle { query.value = "" }
+        title("Discover")
+        compose.onNodeWithTag("browse").performScrollToIndex(0)
+        title("Search")
+        screenshot("search-heading-restored")
+    }
+
+    @Test fun headingWorksWithoutHistoryAndWithExpandedHistory() {
+        history.value = emptyList()
+        compose.setContent { Browse() }
+        compose.onNodeWithTag("browse").performScrollToIndex(4)
+        compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText("Discover")))
+        compose.runOnIdle { history.value = (1..10).map { "Query $it" } }
+        compose.onNodeWithTag("browse").performScrollToIndex(0)
+        compose.onNodeWithText("Show all (10)").performClick()
+        compose.onNodeWithText("Query 9").performScrollTo()
+        compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText("Search")))
+        compose.onNodeWithTag("browse").performScrollToIndex(5)
+        compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText("Discover")))
+        screenshot("discover-heading-restored")
     }
 
     @Test fun historyStartsCompactAndFiltersAreAdjacentToResults() {

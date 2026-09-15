@@ -9,8 +9,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
-BASELINE = '530f4cb483f8d211ddd7c5365ca7c516a9b69ad0'
-VERSION = '0.4.17-ui.2'
+BASELINE = 'c9d91d761ad49f3d482bde3e42de8eab2470bbaf'
+VERSION = '0.4.17-ui.3'
 
 
 def load(name, path):
@@ -45,6 +45,7 @@ def main():
         'composeApp/src/commonMain/composeResources/values/strings.xml',
         'composeApp/src/commonMain/composeResources/values/search_polish.xml',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt',
+        'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerCaptionInsets.kt',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOverlayScaffold.kt',
         'composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt',
@@ -70,18 +71,18 @@ def main():
     release.require(len(ui) >= 18 and all(v['status'] == 'passed' for v in ui.values()),
                     'UI interaction or layout test failed/skipped')
     tests.critical(ui)
-    for suite, count in [('SearchBrowseLayoutTest', 8), ('PlayerPolishLayoutTest', 8), ('PortraitSubtitleViewportTest', 2)]:
+    for suite, count in [('SearchBrowseLayoutTest', 10), ('PlayerPolishLayoutTest', 10), ('PortraitSubtitleViewportTest', 5)]:
         release.require(sum('.' + suite + '#' in k for k in ui) >= count, 'Missing focused suite: ' + suite)
     before = tests.run_tasks(baseline, [tests.TASK], report, 'baseline')
     after = tests.run_tasks(source, [tests.TASK, tests.ASSEMBLE], report, 'candidate',
                             ['--continue', '-Pnuvio.android.abis=arm64-v8a'])
-    release.require(len(before) >= 900, 'Baseline suite unexpectedly incomplete')
+    release.require(len(before) >= 921, 'Baseline suite unexpectedly incomplete')
     inherited = tests.compare(after, before)
     release.require(all(after.get(k, {}).get('status') == 'passed' for k in ui),
                     'UI tests did not pass in the full suite')
     apks = list((source / 'androidApp/build/outputs/apk/full/release').glob('*.apk'))
     release.require(len(apks) == 1, 'Expected exactly one Full ARM64 APK')
-    tag = '0.4.17-orientation-ui.2'
+    tag = '0.4.17-orientation-ui.3'
     release.BUILDS[VERSION] = (sha, 122, tag)
     record = release.verify(source, VERSION, apks[0])
     # Report presence only. Never write credential values to logs or release artifacts.
@@ -98,19 +99,19 @@ def main():
                   device_smoke_test='Not run: no physical phone attached',
                   changed_paths=changed)
     (report / 'verification.json').write_text(json.dumps(record, indent=2) + '\n')
-    output = report / 'Nuvio-Enhanced-0.4.17-Orientation-UI2-Full-arm64-v8a.apk'
+    output = report / 'Nuvio-Enhanced-0.4.17-Orientation-UI3-Full-arm64-v8a.apk'
     shutil.copyfile(apks[0], output)
     release.require(hashlib.sha256(output.read_bytes()).hexdigest() == record['apk_sha256'],
                     'Delivery copy mismatch')
     (report / 'release-notes.md').write_text(
-        '# Orientation UI update 2\n\n'
+        '# Orientation UI update 3\n\n'
         'Built on the existing 0.4.17 Orientation release.\n\n'
         '- Recent searches appear before Discover, with three entries initially and Show all/Show less.\n'
-        '- Discover filters stay directly above their results; the Search title stays consistent.\n'
+        '- Discover filters stay directly above their results; the title smoothly changes from Search to Discover while browsing.\n'
         '- Discover uses the same heading hierarchy as Recent Searches.\n'
         '- Hero catalogs replaces Catalogs Source, including Settings search.\n'
-        '- Portrait subtitles: fixed navigation for language/tracks/style and a persistent Off action.\n'
-        '- Portrait captions follow the video; landscape caption behavior is preserved.\n'
+        '- Portrait subtitles: aligned language/Off controls, selected tabs, and a stable sheet.\n'
+        '- Portrait captions use one video coordinate space and clear measured bottom controls; real text and bitmap drawing tests cover Fit/Zoom/rotation.\n'
         '- Full audio labels wrap; track menus hide player controls in both orientations.\n'
         '- Speed feedback clears the measured header; missing tracking configuration is explained.\n'
         '- Orientation policy, decoding, downloads, accounts and profile storage are preserved.\n\n'

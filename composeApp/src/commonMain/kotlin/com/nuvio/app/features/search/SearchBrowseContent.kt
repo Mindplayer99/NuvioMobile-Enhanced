@@ -31,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import nuvio.composeapp.generated.resources.compose_nav_search
+import nuvio.composeapp.generated.resources.compose_search_discover_title
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_search_recent_searches
 import nuvio.composeapp.generated.resources.compose_search_remove_recent_search
@@ -133,5 +135,32 @@ private fun SearchRecentRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Use the section boundary, not a hard-coded scroll distance or history length. */
+@Composable
+internal fun SearchContextHeader(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    query: String,
+    isSearchFocused: Boolean,
+    hasHistory: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val showDiscover by androidx.compose.runtime.remember(listState, query, isSearchFocused, hasHistory) {
+        androidx.compose.runtime.derivedStateOf {
+            val headingIndex = if (hasHistory) 1 else 0
+            query.isBlank() && !isSearchFocused && listState.firstVisibleItemIndex > headingIndex
+        }
+    }
+    androidx.compose.animation.Crossfade(
+        targetState = showDiscover,
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "Search section title",
+    ) { discover ->
+        com.nuvio.app.core.ui.NuvioScreenHeader(
+            title = stringResource(if (discover) Res.string.compose_search_discover_title else Res.string.compose_nav_search),
+            modifier = modifier,
+        )
     }
 }

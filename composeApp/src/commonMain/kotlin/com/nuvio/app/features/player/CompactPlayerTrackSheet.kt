@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContent
@@ -40,6 +41,7 @@ import org.jetbrains.compose.resources.stringResource
 internal fun CompactPlayerTrackSheet(
     title: String,
     onDismiss: () -> Unit,
+    fillAvailableHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     BoxWithConstraints(
@@ -49,7 +51,8 @@ internal fun CompactPlayerTrackSheet(
             modifier = Modifier
                 .align(Alignment.Center)
                 .width((maxWidth * 0.92f).coerceAtMost(560.dp))
-                .heightIn(max = (maxHeight * 0.90f).coerceAtMost(840.dp))
+                .then(if (fillAvailableHeight) Modifier.height((maxHeight * 0.90f).coerceAtMost(840.dp))
+                    else Modifier.heightIn(max = (maxHeight * 0.90f).coerceAtMost(840.dp)))
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) },
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.nuvio.colors.surface.copy(alpha = 1f),

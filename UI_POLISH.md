@@ -1,31 +1,20 @@
-# Orientation UI update 2
+# Orientation UI update 3
 
-Base: exact published 0.4.17 Orientation, 530f4cb483f8d211ddd7c5365ca7c516a9b69ad0.
+Based on exact UI2 source c9d91d761ad49f3d482bde3e42de8eab2470bbaf.
+Correct portrait caption coordinate handling for both nested and sibling SubtitleView layouts;
+check complete layout before drawing, avoid double mapping bitmap cues, and retain clearance
+above the measured portrait controls. Existing mpv behavior is retained.
+Subtitle sheet keeps its height, uses equal-width language/Off actions and selected tabs.
+Restore Search to Discover contextual heading with a short crossfade, respecting search focus/query.
+Keep UI2 history grouping, Hero labels, audio wrapping and orientation policy/storage.
 
-Implemented: compact expandable recent searches before Discover; adjacent filters/results;
-consistent Search/Discover hierarchy; Hero and Hero catalogs labels and Settings search terms.
-Portrait subtitle navigation now separates languages, tracks and style, with a fixed Off action.
-The selected track is scrolled into view on reopen. Audio names wrap without truncation.
-Audio/subtitle menus suppress playback controls in both orientations. Feedback clears the measured
-header. Media3 captions follow the actual portrait video content bounds and restore landscape layout
-without Activity recreation; mpv plain-text subtitles avoid portrait black margins, preserving
-landscape defaults and authored ASS styles. Tracking-unavailable messages explain the build limitation.
+Verification includes real native SubtitleView drawing of text/bitmap cues in Fit, Zoom, Fill,
+rotation and short windows, Compose interactions and screenshots, full regression comparison
+with UI2, and signed Full ARM64 APK/package/version/remote-byte verification.
+No physical phone is attached; real playback/device performance smoke testing remains outstanding.
+VC-1 black-screen behavior is reported in both forks and is outside this UI correction.
+Recordings did not establish a general loading-speed regression; no caching/network rewrite.
+Trakt/Simkl credentials and matched metadata configuration remain external follow-up items.
 
-Not changed: orientation policy/persistence, requested-orientation effects, decoding options,
-profile/account storage, downloads, addon networking, package, signer and production updater channel.
-
-Metadata investigation confirms TMDB enrichment returns unchanged addon metadata when disabled or
-missing an API key. No response from the user's configured addon/profile is available here; there is
-no proven cast-rendering defect to fix. Settings use NuvioScreen's shared bottom-overlay inset;
-the custom settings-search list adds the overlay padding explicitly. Existing scrolling header and
-optional theme decorations are retained. These are not established defects.
-
-Verification gate: focused Search/player UI and all orientation/updater/download tests, full suite
-against the exact installed-release source, zero new failure signatures, signed Full ARM64 APK checks.
-Missing tests, critical failures, compile failures and verification mismatches block delivery. Runtime
-credential availability is reported as booleans only. Actual OAuth login and phone playback/frame-time
-smoothness remain unverified. Experimental libass overlays require device validation separately.
-
-Version 0.4.17-ui.2 / 122 is a manual-install prerelease, so later numeric upstream updates remain
-installable. This branch does not advance orientation-current or replace existing releases. Canonical
-carry-forward must be verified independently before automation activation.
+Version 0.4.17-ui.3 / 122; manual-install prerelease. Canonical automation must carry the same
+runtime, preserving all release gates. Previous releases and orientation-current stay unchanged.

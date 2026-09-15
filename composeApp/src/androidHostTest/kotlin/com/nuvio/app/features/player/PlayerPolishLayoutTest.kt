@@ -57,6 +57,27 @@ class PlayerPolishLayoutTest {
         }
     }
 
+    @Test fun languageAndOffHaveEqualWidthAndTabsExposeSelection() {
+        compose.setContent { Subtitles() }
+        val language = compose.onNodeWithTag("subtitle-language-picker").fetchSemanticsNode().boundsInRoot
+        val off = compose.onNodeWithTag("subtitle-off").fetchSemanticsNode().boundsInRoot
+        assertTrue(kotlin.math.abs(language.width - off.width) < 1f)
+        compose.onNodeWithTag("subtitle-tracks-tab").assertIsSelected()
+        compose.onNodeWithTag("subtitle-style-tab").performClick().assertIsSelected()
+        compose.onNodeWithTag("subtitle-tracks-tab").assertIsNotSelected()
+        screenshot("portrait-tabs-selected")
+    }
+
+    @Test fun turningOffDoesNotMoveTheSheetHeader() {
+        compose.setContent { Subtitles() }
+        val before = compose.onNodeWithContentDescription("Close").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("subtitle-off").performClick().assertIsSelected()
+        val after = compose.onNodeWithContentDescription("Close").fetchSemanticsNode().boundsInRoot
+        assertEquals(before, after)
+        compose.onNodeWithTag("subtitle-language-picker").assertIsDisplayed()
+        screenshot("portrait-stable-off")
+    }
+
     @Test fun styleAndOffStayReachableWithThirtyNineTracks() {
         compose.setContent { Subtitles() }
         compose.onNodeWithTag("subtitle-style-tab").assertIsDisplayed().performClick()

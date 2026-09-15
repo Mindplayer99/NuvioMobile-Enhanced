@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import nuvio.composeapp.generated.resources.*
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Unit)? = null) {
     val runtime = this
     var controlsHeaderHeight by remember { mutableStateOf(0.dp) }
+    var controlsFooterHeight by remember(layoutSize) { mutableStateOf(0.dp) }
     val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
     val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
     val currentGestureFeedback = liveGestureFeedback ?: gestureFeedback
@@ -236,6 +238,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Un
         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
         val initialPositionRequestKey = currentInitialPositionRequestKey()
         if (playerSurfaceSourceUrl != null) {
+            CompositionLocalProvider(LocalPlayerCaptionBottomInset provides
+                if (metrics.compactControls) controlsFooterHeight + 8.dp else 0.dp) {
             PlatformPlayerSurface(
                 sourceUrl = playerSurfaceSourceUrl,
                 sourceAudioUrl = activeSourceAudioUrl,
@@ -280,6 +284,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Un
             )
         }
 
+        }
+
         AnimatedVisibility(
             visible = pausedOverlayVisible && !controlsVisible && !playerControlsLocked,
             enter = fadeIn(animationSpec = tween(durationMillis = 220)),
@@ -300,7 +306,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Un
             )
         }
 
-        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it })
+        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it }, onFooterHeightChanged = { controlsFooterHeight = it })
         RenderPlaybackOverlays(
             runtime = runtime,
             displayedPositionMs = displayedPositionMs,
@@ -340,6 +346,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
     isEpisode: Boolean,
     onRotateScreen: (() -> Unit)?,
     onHeaderHeightChanged: (Dp) -> Unit,
+    onFooterHeightChanged: (Dp) -> Unit,
 ) {
     val density = LocalDensity.current
     val isInPip = rememberIsInPictureInPicture()
@@ -501,6 +508,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(
             },
             horizontalSafePadding = horizontalSafePadding,
             onHeaderHeightChanged = { height -> onHeaderHeightChanged(with(density) { height.toDp() }) },
+            onFooterHeightChanged = { height -> onFooterHeightChanged(with(density) { height.toDp() }) },
             modifier = Modifier.fillMaxSize(),
         )
     }

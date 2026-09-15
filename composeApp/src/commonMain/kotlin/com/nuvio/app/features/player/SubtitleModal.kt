@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,6 +36,11 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
+import nuvio.composeapp.generated.resources.compose_action_off
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.addon_title
 import nuvio.composeapp.generated.resources.compose_player_built_in
@@ -207,12 +216,17 @@ fun SubtitleModal(
                 CompactPlayerTrackSheet(
                     title = stringResource(Res.string.compose_player_subtitles),
                     onDismiss = onDismiss,
+                    fillAvailableHeight = true,
                 ) {
                     // Navigation stays outside the scrolling content, regardless of track count.
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
+                    Row(
+                        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedButton(
                             onClick = { compactPage = "languages" },
-                            modifier = Modifier.weight(1f).testTag("subtitle-language-picker"),
+                            modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp).testTag("subtitle-language-picker"),
                         ) {
                             Text(
                                 text = when (activeLanguageKey) {
@@ -220,26 +234,38 @@ fun SubtitleModal(
                                     SubtitleUnknownLanguageKey -> stringResource(Res.string.subtitle_language_unknown)
                                     else -> languageLabelForCode(activeLanguageKey)
                                 },
+                                modifier = Modifier.weight(1f),
                                 maxLines = 2,
                             )
+                            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
                         }
-                        TextButton(
+                        FilterChip(
+                            selected = activeLanguageKey == SubtitleOffLanguageKey,
                             onClick = {
                                 languageItems.firstOrNull { it.key == SubtitleOffLanguageKey }?.let(selectLanguage)
                                 compactPage = "tracks"
                             },
-                            modifier = Modifier.testTag("subtitle-off"),
-                        ) { Text(stringResource(Res.string.compose_player_none)) }
+                            modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp).testTag("subtitle-off"),
+                            label = { Text(stringResource(Res.string.compose_action_off)) },
+                        )
                     }
-                    Row(Modifier.fillMaxWidth()) {
-                        TextButton(
+                    TabRow(
+                        selectedTabIndex = if (compactPage == "style") 1 else 0,
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White,
+                    ) {
+                        Tab(
+                            selected = compactPage != "style",
                             onClick = { compactPage = "tracks" },
-                            modifier = Modifier.weight(1f).testTag("subtitle-tracks-tab"),
-                        ) { Text(stringResource(Res.string.compose_player_subtitles)) }
-                        TextButton(
+                            modifier = Modifier.testTag("subtitle-tracks-tab"),
+                            text = { Text(stringResource(Res.string.compose_player_subtitles)) },
+                        )
+                        Tab(
+                            selected = compactPage == "style",
                             onClick = { compactPage = "style" },
-                            modifier = Modifier.weight(1f).testTag("subtitle-style-tab"),
-                        ) { Text(stringResource(Res.string.compose_player_style)) }
+                            modifier = Modifier.testTag("subtitle-style-tab"),
+                            text = { Text(stringResource(Res.string.compose_player_style)) },
+                        )
                     }
                     when (compactPage) {
                         "languages" -> LazyColumn(

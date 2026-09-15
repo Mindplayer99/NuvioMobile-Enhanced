@@ -120,6 +120,7 @@ internal fun PlayerControlsShell(
     onScrubFinished: (Long) -> Unit,
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
     onHeaderHeightChanged: (Int) -> Unit = {},
+    onFooterHeightChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -223,6 +224,7 @@ internal fun PlayerControlsShell(
                     onQualityClick = onQualityClick,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .onSizeChanged { onFooterHeightChanged(it.height) }
                         .fillMaxWidth()
                         .padding(horizontal = metrics.horizontalPadding)
                         .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Bottom))

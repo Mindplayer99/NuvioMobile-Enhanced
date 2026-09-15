@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.network.NetworkCondition
@@ -78,6 +79,7 @@ fun SearchScreen(
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
 ) {
     val focusRequester = remember { FocusRequester() }
+    var searchFieldFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(searchFocusRequestCount) {
         if (searchFocusRequestCount > 0) {
@@ -201,15 +203,15 @@ fun SearchScreen(
         val homeSectionPadding = remember(maxWidth) {
             homeSectionHorizontalPaddingForWidth(maxWidth.value)
         }
-        val headerTitle = stringResource(Res.string.compose_nav_search)
 
         androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    NuvioScreenHeader(
-                        title = headerTitle,
+                    SearchContextHeader(
+                        listState = listState, query = query, isSearchFocused = searchFieldFocused,
+                        hasHistory = recentSearches.isNotEmpty(),
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
@@ -218,7 +220,7 @@ fun SearchScreen(
                             value = query,
                             onValueChange = { query = it },
                             placeholder = stringResource(Res.string.compose_search_placeholder),
-                            modifier = Modifier.focusRequester(focusRequester),
+                            modifier = Modifier.focusRequester(focusRequester).onFocusChanged { searchFieldFocused = it.isFocused },
                             trailingContent = if (query.isNotBlank()) {
                                 {
                                     IconButton(onClick = { query = "" }) {

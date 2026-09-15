@@ -1,7 +1,7 @@
 name: Verify Orientation UI polish
 on:
   push:
-    branches: [feature/orientation-ui-polish]
+    branches: [feature/orientation-ui3]
   workflow_dispatch:
 
 permissions:
@@ -24,18 +24,21 @@ jobs:
           lfs: true
       - uses: actions/checkout@v6
         with:
-          ref: 530f4cb483f8d211ddd7c5365ca7c516a9b69ad0
+          ref: c9d91d761ad49f3d482bde3e42de8eab2470bbaf
           path: baseline
           lfs: true
       - uses: actions/checkout@v6
         with:
-          ref: 3799ecdd1cf2478c71fb0efd133e26236fc7ac5c
+          ref: 45a7c30c90289db3a95f4c7cac92b8bf2a01fb82
           path: release-tools
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v6
       - name: Configure existing signing identity
         env:
