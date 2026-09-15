@@ -48,6 +48,437 @@ index 0000000000000000000000000000000000000000..12023c62461885cacfe4ccb2bb916f46
 +        assertEquals(ActivityInfo.SCREEN_ORIENTATION_USER, null.toAndroidRequestedOrientation())
 +    }
 +}
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..9128831929e7206ab6efdd8c4444b788e89f333d
+--- /dev/null
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt
+@@ -0,0 +1,149 @@
++package com.nuvio.app.features.player
++
++import android.graphics.Bitmap
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.asAndroidBitmap
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.semantics.SemanticsActions
++import androidx.compose.ui.test.*
++import androidx.compose.ui.test.junit4.StateRestorationTester
++import androidx.compose.ui.test.junit4.createComposeRule
++import androidx.compose.ui.text.TextLayoutResult
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.dp
++import com.nuvio.app.core.ui.NuvioTheme
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++import kotlin.test.assertEquals
++import kotlin.test.assertFalse
++import kotlin.test.assertTrue
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34], qualifiers = "w411dp-h891dp-mdpi")
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class PlayerPolishLayoutTest {
++    @get:Rule val compose = createComposeRule()
++    private val visible = mutableStateOf(true)
++    private val selected = mutableStateOf(35)
++    private val tracks = (0..38).map { SubtitleTrack(it, "$it", "English track $it", "en") } +
++        SubtitleTrack(39, "hi", "Hindi track", "hi")
++
++    @Composable private fun Subtitles(fontScale: Float = 1f) {
++        NuvioTheme {
++            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
++                SubtitleModal(
++                    visible = visible.value, subtitleTracks = tracks, selectedSubtitleIndex = selected.value,
++                    addonSubtitles = emptyList(), selectedAddonSubtitleId = null,
++                    isLoadingAddonSubtitles = false, preferredSubtitleLanguage = "en",
++                    secondaryPreferredSubtitleLanguage = "hi", subtitleStyle = SubtitleStyleState.DEFAULT,
++                    subtitleDelayMs = 0, selectedAddonSubtitle = null,
++                    subtitleAutoSyncState = SubtitleAutoSyncUiState(),
++                    onBuiltInTrackSelected = { selected.value = it }, onAddonSubtitleSelected = {},
++                    onFetchAddonSubtitles = {}, onStyleChanged = {}, onSubtitleDelayChanged = {},
++                    onSubtitleDelayReset = {}, onAutoSyncCapture = {}, onAutoSyncCueSelected = {},
++                    onAutoSyncReload = {}, onDismiss = { visible.value = false },
++                )
++            }
++        }
++    }
++
++    @Test fun styleAndOffStayReachableWithThirtyNineTracks() {
++        compose.setContent { Subtitles() }
++        compose.onNodeWithTag("subtitle-style-tab").assertIsDisplayed().performClick()
++        compose.onNodeWithTag("subtitle-style").assertIsDisplayed()
++        compose.onNodeWithTag("subtitle-options").assertDoesNotExist()
++        compose.onNodeWithTag("subtitle-off").assertIsDisplayed().performClick()
++        compose.runOnIdle { assertEquals(-1, selected.value) }
++        screenshot("portrait-subtitle-off")
++    }
++
++    @Test fun openingAndReopeningScrollToSelectedTrack() {
++        compose.setContent { Subtitles() }
++        compose.onNodeWithText("English track 35").assertIsDisplayed()
++        compose.onNodeWithTag("subtitle-options").performScrollToIndex(0)
++        compose.onNodeWithContentDescription("Close").performClick()
++        compose.runOnIdle { visible.value = true }
++        compose.onNodeWithText("English track 35").assertIsDisplayed()
++        screenshot("portrait-selected-track")
++    }
++
++    @Test fun languagePickerLeadsDirectlyToItsTracks() {
++        compose.setContent { Subtitles() }
++        compose.onNodeWithTag("subtitle-language-picker").performClick()
++        compose.onNodeWithTag("subtitle-languages").performScrollToNode(hasText("Hindi"))
++        compose.onNodeWithText("Hindi").performClick()
++        compose.onNodeWithTag("subtitle-languages").assertDoesNotExist()
++        compose.onNodeWithText("Hindi track").assertIsDisplayed().performClick()
++        compose.runOnIdle { assertEquals(39, selected.value) }
++    }
++
++    @Test fun stylePageSurvivesStateRestoration() {
++        val restoration = StateRestorationTester(compose)
++        restoration.setContent { Subtitles() }
++        compose.onNodeWithTag("subtitle-style-tab").performClick()
++        restoration.emulateSavedInstanceStateRestore()
++        compose.onNodeWithTag("subtitle-style").assertIsDisplayed()
++        compose.onNodeWithTag("subtitle-tracks-tab").performClick()
++        compose.onNodeWithTag("subtitle-options").assertIsDisplayed()
++    }
++
++    @Test fun largeTextKeepsNavigationAndCloseAccessible() {
++        compose.setContent { Subtitles(1.5f) }
++        compose.onNodeWithTag("subtitle-style-tab").assertIsDisplayed().performClick()
++        compose.onNodeWithTag("subtitle-off").assertIsDisplayed()
++        compose.onNodeWithContentDescription("Close").assertIsDisplayed()
++        screenshot("portrait-subtitle-large-text")
++    }
++
++    @Test @Config(qualifiers = "w891dp-h411dp-mdpi")
++    fun landscapeStillShowsTrackRailsAndSelectedTrack() {
++        compose.setContent { Subtitles() }
++        compose.onNodeWithTag("subtitle-tracks-tab").assertDoesNotExist()
++        compose.onNodeWithText("English track 35").assertIsDisplayed()
++        screenshot("landscape-subtitle-rails")
++    }
++
++    @Test fun longAudioLabelWrapsWithoutLosingCodecOrRole() {
++        val label = "English Original commentary with director and cinematographer DTS-HD Master Audio 7.1"
++        compose.setContent {
++            NuvioTheme {
++                AudioTrackModal(true, listOf(AudioTrack(0, "long", label, "en")), 0, {}, {})
++            }
++        }
++        val layouts = mutableListOf<TextLayoutResult>()
++        compose.onNodeWithText(label).assertIsDisplayed().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
++        assertTrue(layouts.single().lineCount > 1)
++        assertFalse(layouts.single().hasVisualOverflow)
++        screenshot("portrait-audio-label")
++    }
++
++    @Test fun speedFeedbackClearsTallHeader() {
++        compose.setContent {
++            NuvioTheme {
++                Box(Modifier.fillMaxSize()) {
++                    val feedback = GestureFeedbackState(message = "1.25×")
++                    PlayerGestureFeedbackOverlay(feedback, feedback, 0.dp, 180.dp)
++                }
++            }
++        }
++        val pill = compose.onNodeWithText("1.25×").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
++        assertTrue(pill.top >= 188f)
++        screenshot("portrait-speed-feedback")
++    }
++
++    private fun screenshot(name: String) {
++        val path = File("build/reports/ui-polish/$name.png")
++        path.parentFile.mkdirs()
++        path.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
++    }
++}
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..aa6bf64d8ba4298a6f17fa53b27f1bf1edeae6f0
+--- /dev/null
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt
+@@ -0,0 +1,47 @@
++package com.nuvio.app.features.player
++
++import android.view.View
++import android.view.ViewGroup
++import android.widget.FrameLayout
++import androidx.media3.ui.PlayerView
++import androidx.media3.ui.R
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import kotlin.test.assertEquals
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34])
++class PortraitSubtitleViewportTest {
++    @Test fun captionsFollowVideoBoundsAndRestoreLandscapeWithoutRecreatingView() {
++        val view = PlayerView(ApplicationProvider.getApplicationContext())
++        view.installPortraitSubtitleViewport()
++        val frame = view.findViewById<View>(R.id.exo_content_frame)
++        view.layout(0, 0, 400, 900)
++        frame.layout(0, 337, 400, 562)
++        val portrait = view.subtitleView!!.layoutParams as FrameLayout.LayoutParams
++        assertEquals(337, portrait.topMargin)
++        assertEquals(225, portrait.height)
++        view.layout(0, 0, 900, 400)
++        frame.layout(94, 0, 805, 400)
++        val landscape = view.subtitleView!!.layoutParams as FrameLayout.LayoutParams
++        assertEquals(0, landscape.topMargin)
++        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, landscape.height)
++    }
++
++    @Test fun croppedAndUnknownVideoBoundsNeverCreateNegativeCaptionHeight() {
++        val view = PlayerView(ApplicationProvider.getApplicationContext())
++        val frame = view.findViewById<View>(R.id.exo_content_frame)
++        view.layout(0, 0, 400, 900)
++        frame.layout(0, -100, 400, 1000)
++        view.alignPortraitSubtitleViewport()
++        val params = view.subtitleView!!.layoutParams as FrameLayout.LayoutParams
++        assertEquals(0, params.topMargin)
++        assertEquals(900, params.height)
++        frame.layout(0, 0, 0, 0)
++        view.alignPortraitSubtitleViewport()
++        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.height)
++    }
++}
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..a04e104deda5edc89a283b366e3a4341df952427
+--- /dev/null
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt
+@@ -0,0 +1,170 @@
++package com.nuvio.app.features.search
++
++import android.graphics.Bitmap
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.asAndroidBitmap
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.test.*
++import androidx.compose.ui.test.junit4.StateRestorationTester
++import androidx.compose.ui.test.junit4.createComposeRule
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.dp
++import com.nuvio.app.core.ui.NuvioTheme
++import com.nuvio.app.core.ui.NuvioScreen
++import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++import kotlin.test.assertEquals
++import kotlin.test.assertTrue
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34], qualifiers = "w411dp-h891dp-mdpi")
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class SearchBrowseLayoutTest {
++    @get:Rule val compose = createComposeRule()
++    private val history = mutableStateOf((1..10).map { "Query $it" })
++    private var selected: String? = null
++
++    @Composable
++    private fun Browse(fontScale: Float = 1f) {
++        NuvioTheme {
++            CompositionLocalProvider(
++                LocalDensity provides Density(LocalDensity.current.density, fontScale),
++                LocalNuvioBottomNavigationOverlayPadding provides 80.dp,
++            ) {
++                NuvioScreen(
++                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag("browse"),
++                    horizontalPadding = 0.dp,
++                    topPadding = 0.dp,
++                ) {
++                    searchBrowseHeader(
++                        recentSearches = history.value,
++                        onSearchPress = { selected = it },
++                        onRemoveSearch = { query -> history.value = history.value.filterNot { it == query } },
++                    ) {
++                        Box(Modifier.fillMaxWidth().height(56.dp).testTag("filters")) {
++                            Text("Series · Popular · All Genres", Modifier.padding(16.dp))
++                        }
++                    }
++                    item(key = "first_result") {
++                        Text("First result", Modifier.fillMaxWidth().height(160.dp).testTag("first_result"))
++                    }
++                    items(12) { index ->
++                        Text("Result $index", Modifier.fillMaxWidth().height(80.dp))
++                    }
++                    item(key = "last_result") {
++                        Text("Last result", Modifier.fillMaxWidth().height(80.dp).testTag("last_result"))
++                    }
++                }
++            }
++        }
++    }
++
++    @Test fun historyStartsCompactAndFiltersAreAdjacentToResults() {
++        compose.setContent { Browse() }
++        compose.onNodeWithText("Query 3").assertIsDisplayed()
++        compose.onNodeWithText("Query 4").assertDoesNotExist()
++        compose.onNodeWithText("Show all (10)").assertIsDisplayed()
++        val historyBottom = compose.onNodeWithText("Query 3").fetchSemanticsNode().boundsInRoot.bottom
++        val heading = compose.onNodeWithText("Discover").fetchSemanticsNode().boundsInRoot
++        val filters = compose.onNodeWithTag("filters").fetchSemanticsNode().boundsInRoot
++        val result = compose.onNodeWithTag("first_result").fetchSemanticsNode().boundsInRoot
++        assertTrue(historyBottom < heading.top)
++        assertTrue(heading.bottom <= filters.top)
++        assertTrue(result.top >= filters.bottom && result.top - filters.bottom <= 24f)
++        screenshot("portrait-compact")
++    }
++
++    @Test fun allHistoryCanBeExpandedAndCollapsedWithoutDeletingEntries() {
++        compose.setContent { Browse() }
++        compose.onNodeWithText("Show all (10)").performClick()
++        compose.onNodeWithText("Query 10").performScrollTo().assertIsDisplayed()
++        compose.onNodeWithText("Show less").performScrollTo().performClick()
++        compose.onNodeWithTag("browse").performScrollToIndex(0)
++        compose.onNodeWithText("Query 4").assertDoesNotExist()
++        assertEquals(10, history.value.size)
++    }
++
++    @Test fun deletingHistoryDoesNotRunSearchAndRevealsNextEntry() {
++        compose.setContent { Browse() }
++        compose.onAllNodesWithContentDescription("Remove recent search")[0].performClick()
++        compose.onNodeWithText("Query 1").assertDoesNotExist()
++        compose.onNodeWithText("Query 4").assertIsDisplayed()
++        assertEquals(null, selected)
++        assertEquals(9, history.value.size)
++        compose.onNodeWithText("Query 2").performClick()
++        assertEquals("Query 2", selected)
++    }
++
++    @Test fun emptyHistoryHasNoBlankSectionAndDiscoverStillWorks() {
++        history.value = emptyList()
++        compose.setContent { Browse() }
++        compose.onNodeWithText("Recent Searches").assertDoesNotExist()
++        compose.onNodeWithText("Discover").assertIsDisplayed()
++        compose.onNodeWithTag("first_result").assertIsDisplayed()
++    }
++
++    @Test fun shortHistoryHasNoExpansionButton() {
++        history.value = history.value.take(3)
++        compose.setContent { Browse() }
++        compose.onNodeWithText("Show all", substring = true).assertDoesNotExist()
++        compose.onNodeWithText("Query 3").assertIsDisplayed()
++    }
++
++    @Test fun expandedHistorySurvivesSavedStateRestoration() {
++        val restoration = StateRestorationTester(compose)
++        restoration.setContent { Browse() }
++        compose.onNodeWithText("Show all (10)").performClick()
++        restoration.emulateSavedInstanceStateRestore()
++        compose.onNodeWithText("Query 10").performScrollTo().assertIsDisplayed()
++        compose.onNodeWithText("Show less").performScrollTo().assertIsDisplayed()
++    }
++
++    @Test
++    @Config(qualifiers = "w891dp-h411dp-mdpi")
++    fun landscapeCanReachLastResultAboveBottomOverlaySpace() {
++        compose.setContent { Browse() }
++        compose.onNodeWithTag("browse").performScrollToNode(hasTestTag("last_result"))
++        compose.onNodeWithTag("browse").performScrollToIndex(16)
++        compose.onNodeWithTag("last_result").assertIsDisplayed()
++        compose.onNodeWithTag("filters").assertIsDisplayed()
++        val viewport = compose.onNodeWithTag("browse").fetchSemanticsNode().boundsInRoot
++        val last = compose.onNodeWithTag("last_result").fetchSemanticsNode().boundsInRoot
++        assertTrue(last.bottom <= viewport.bottom - 80f)
++        screenshot("landscape-scrolled")
++    }
++
++    @Test fun largeTextKeepsHistoryActionsReachable() {
++        compose.setContent { Browse(fontScale = 1.5f) }
++        compose.onNodeWithText("Show all (10)").performScrollTo().performClick()
++        compose.onNodeWithText("Query 10").performScrollTo().assertIsDisplayed()
++        compose.onNodeWithText("Show less").performScrollTo().performClick()
++        compose.onNodeWithTag("browse").performScrollToIndex(0)
++        compose.onNodeWithText("Query 3").assertIsDisplayed()
++        screenshot("large-text")
++    }
++
++    private fun screenshot(name: String) {
++        val destination = File("build/reports/ui-polish/$name.png")
++        destination.parentFile.mkdirs()
++        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
++        destination.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
++    }
++}
+diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt
+index f4e795032a1864dc211bb198c2af0bbb0af1cbf0..c82394bc6537d5d21b937c074abfeff3bc439ad8 100644
+--- a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt
++++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt
+@@ -1179,6 +1179,7 @@ private fun ExoPlayerSurface(
+                 keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
+                 this.resizeMode = resizeMode.toExoResizeMode()
+                 setShutterBackgroundColor(android.graphics.Color.BLACK)
++                installPortraitSubtitleViewport()
+                 playerViewRef = this
+                 sidecarController.bindSubtitleView(this.subtitleView)
+                 syncLibassOverlay(
+@@ -1480,11 +1481,13 @@ private fun LibmpvPlayerSurface(
+                     InAppLogger.error("MPV/Android", "Failed to initialize libmpv: ${error.localizedMessage ?: error::class.simpleName.orEmpty()}")
+                     latestOnError.value(error.localizedMessage ?: "libmpv unavailable")
+                 }
++                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applySubtitleViewport() }
+                 playerViewRef = this
+             }
+         },
+         update = { view ->
+             playerViewRef = view
++            view.applySubtitleViewport()
+             view.applyResizeMode(resizeMode)
+         },
+         onRelease = { view ->
+@@ -1838,6 +1841,20 @@ private class NuvioLibmpvView(
+         }
+     }
+ 
++    private var lastPortraitSubtitleViewport: Boolean? = null
++
++    fun applySubtitleViewport() {
++        if (width <= 0 || height <= 0) return
++        val portrait = height > width
++        if (lastPortraitSubtitleViewport == portrait) return
++        lastPortraitSubtitleViewport = portrait
++        executeMpv {
++            // Keep plain-text captions on the picture in portrait. Preserve landscape defaults
++            // and authored ASS positions; do not force ASS style overrides.
++            mpv.setPropertyBoolean("sub-use-margins", !portrait)
++        }
++    }
++
+     fun applyResizeMode(resizeMode: PlayerResizeMode) {
+         executeMpv {
+             when (resizeMode) {
 diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt
 index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae8448e202615 100644
 --- a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt
@@ -171,7 +602,7 @@ index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae844
      private val activity: Activity,
      private val audioManager: AudioManager,
 diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt
-index d5ab92f64d015179a2560d38808e7f1c6739c5da..f790398bb92d718d6f46849b659769a0866cef7d 100644
+index 5cdf69755d03cdb98b4597ac1b7b68fe8a6d4e64..35761d9c790df4d7ebdb44f15043d4dfd5cc9bf1 100644
 --- a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt
 +++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt
 @@ -21,6 +21,9 @@ actual object PlayerSettingsStorage {
@@ -211,6 +642,44 @@ index d5ab92f64d015179a2560d38808e7f1c6739c5da..f790398bb92d718d6f46849b659769a0
      actual fun loadResizeMode(): String? =
          preferences?.getString(ProfileScopedKey.of(resizeModeKey), null)
  
+diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewport.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewport.android.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..26a51ef1f61714d4aa8a2a593bbda651a1f2cf49
+--- /dev/null
++++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewport.android.kt
+@@ -0,0 +1,32 @@
++package com.nuvio.app.features.player
++
++import android.view.View
++import android.view.ViewGroup
++import android.widget.FrameLayout
++import androidx.media3.ui.PlayerView
++import androidx.media3.ui.R
++
++/** Follow the actual fitted/cropped picture, including rotation without Activity recreation. */
++internal fun PlayerView.installPortraitSubtitleViewport() {
++    val content = findViewById<View>(R.id.exo_content_frame) ?: return
++    val listener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
++        alignPortraitSubtitleViewport()
++    }
++    content.addOnLayoutChangeListener(listener)
++    addOnLayoutChangeListener(listener)
++}
++
++internal fun PlayerView.alignPortraitSubtitleViewport() {
++    val captions = subtitleView ?: return
++    val content = findViewById<View>(R.id.exo_content_frame) ?: return
++    val params = captions.layoutParams as? FrameLayout.LayoutParams ?: return
++    val portrait = height > width && width > 0 && content.height > 0
++    val top = if (portrait) content.top.coerceIn(0, height) else 0
++    val bottom = if (portrait) content.bottom.coerceIn(top, height) else height
++    val targetHeight = if (portrait && bottom > top) bottom - top else ViewGroup.LayoutParams.MATCH_PARENT
++    if (params.topMargin != top || params.height != targetHeight) {
++        params.topMargin = top
++        params.height = targetHeight
++        captions.layoutParams = params
++    }
++}
 diff --git a/composeApp/src/commonMain/composeResources/values/player_orientation.xml b/composeApp/src/commonMain/composeResources/values/player_orientation.xml
 new file mode 100644
 index 0000000000000000000000000000000000000000..92ba72e9d53a36c1fe9df46c1a145f1f0882687c
@@ -229,8 +698,58 @@ index 0000000000000000000000000000000000000000..92ba72e9d53a36c1fe9df46c1a145f1f
 +    <string name="settings_player_orientation_portrait_description">Start each video in Portrait. The rotate button changes only the current video.</string>
 +    <string name="settings_player_orientation_device_description">Follow system auto-rotate. The rotate button overrides it for the current video.</string>
 +</resources>
+diff --git a/composeApp/src/commonMain/composeResources/values/search_polish.xml b/composeApp/src/commonMain/composeResources/values/search_polish.xml
+new file mode 100644
+index 0000000000000000000000000000000000000000..679e3b6f9767335638f65f4e8850b57561910d6d
+--- /dev/null
++++ b/composeApp/src/commonMain/composeResources/values/search_polish.xml
+@@ -0,0 +1,4 @@
++<resources>
++    <string name="search_history_show_all">Show all (%1$d)</string>
++    <string name="search_history_show_less">Show less</string>
++</resources>
+diff --git a/composeApp/src/commonMain/composeResources/values/strings.xml b/composeApp/src/commonMain/composeResources/values/strings.xml
+index 885080b99692538c510c2437f3bb9c3ce4c33d86..78934421a86c5c19f239d66183d21d85014414cf 100644
+--- a/composeApp/src/commonMain/composeResources/values/strings.xml
++++ b/composeApp/src/commonMain/composeResources/values/strings.xml
+@@ -754,14 +754,14 @@
+     <string name="settings_homescreen_section_catalogs_collections">CATALOGS &amp; COLLECTIONS</string>
+     <string name="settings_homescreen_section_collections">COLLECTIONS</string>
+     <string name="settings_homescreen_section_hero">HOME LAYOUT</string>
+-    <string name="settings_homescreen_section_hero_sources">HERO CONFIGS</string>
++    <string name="settings_homescreen_section_hero_sources">HERO</string>
+     <string name="settings_homescreen_hero_style">Hero Style</string>
+     <string name="settings_homescreen_hero_style_description">How the featured artwork is framed at the top of the home screen.</string>
+     <string name="settings_homescreen_hero_style_full_bleed">Full-bleed</string>
+     <string name="settings_homescreen_hero_style_full_bleed_description">Nuvio Default. Artwork fills the width of the screen.</string>
+     <string name="settings_homescreen_hero_style_card">Card</string>
+-    <string name="settings_homescreen_hero_style_card_description">A clean rounded shaped card.</string>
+-    <string name="settings_homescreen_catalogs_source">Catalogs Source</string>
++    <string name="settings_homescreen_hero_style_card_description">Show artwork inside a rounded card.</string>
++    <string name="settings_homescreen_catalogs_source">Hero catalogs</string>
+     <string name="settings_homescreen_selected_count">%1$d of %2$d selected</string>
+     <string name="settings_homescreen_show_hero">Show Hero Section</string>
+     <string name="settings_homescreen_show_hero_description">Display hero carousel at top of home.</string>
+@@ -1381,7 +1381,7 @@
+     <string name="settings_trakt_features">FEATURES</string>
+     <string name="settings_trakt_finish_sign_in">Finish connection approval</string>
+     <string name="settings_trakt_intro_description">Sync your watchlist, watch progress, continue watching, scrobbles, and personal lists with Trakt.</string>
+-    <string name="settings_trakt_missing_credentials">Missing TRAKT_CLIENT_ID / TRAKT_CLIENT_SECRET in local.properties.</string>
++    <string name="settings_trakt_missing_credentials">Trakt is unavailable in this build. The app developer must configure Trakt before you can connect.</string>
+     <string name="settings_trakt_open_login">Open Trakt Login</string>
+     <string name="settings_trakt_open_activate">Open Trakt Activate</string>
+     <string name="settings_trakt_save_actions_description">Sync your watchlist, watch progress, continue watching, scrobbles, and personal lists with Trakt.</string>
+@@ -1426,7 +1426,7 @@
+     <string name="settings_simkl_finish_sign_in">Finish connection approval</string>
+     <string name="settings_simkl_open_login">Open Simkl Login</string>
+     <string name="settings_simkl_sign_in_description">Connect Simkl to sync lists, watched history, playback progress, and scrobbles.</string>
+-    <string name="settings_simkl_missing_credentials">Missing SIMKL_CLIENT_ID</string>
++    <string name="settings_simkl_missing_credentials">Simkl is unavailable in this build. The app developer must configure Simkl before you can connect.</string>
+     <string name="settings_simkl_visit">Visit Simkl</string>
+     <string name="settings_simkl_invalid_callback">Simkl did not accept the sign-in callback. Please try again.</string>
+     <string name="settings_simkl_authorization_expired">Simkl code expired. Start again.</string>
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt
-index c9b0f46ace1f0dbc816797e2b0296d07118792c4..f9f8dc1c34d677a9273859a6d5470d8538e9aa36 100644
+index c9b0f46ace1f0dbc816797e2b0296d07118792c4..211940e86a89b4742d52aba95e7c43d7c33f7ce3 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt
 @@ -44,45 +44,33 @@ fun AudioTrackModal(
@@ -352,9 +871,20 @@ index c9b0f46ace1f0dbc816797e2b0296d07118792c4..f9f8dc1c34d677a9273859a6d5470d85
              }
          }
      }
+@@ -129,8 +160,8 @@ private fun AudioTrackRow(
+                 text = localizedTrackDisplayName(track.label, track.language, track.index),
+                 color = primaryColor,
+                 style = MaterialTheme.typography.titleMedium,
+-                maxLines = 1,
+-                overflow = TextOverflow.Ellipsis,
++                // Preserve the complete codec, channels and role in long track labels.
++                softWrap = true,
+             )
+             track.language?.takeIf { it.isNotBlank() && it != "und" }?.let { language ->
+                 Text(
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..0ba52ea857d103136908c8e0a678a65e162c4df3
+index 0000000000000000000000000000000000000000..7075c0c0eceeaa404e65d07419e1c469bb898ee1
 --- /dev/null
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt
 @@ -0,0 +1,95 @@
@@ -392,7 +922,7 @@ index 0000000000000000000000000000000000000000..0ba52ea857d103136908c8e0a678a65e
 +import androidx.compose.ui.unit.dp
 +import com.nuvio.app.core.ui.nuvio
 +import nuvio.composeapp.generated.resources.Res
-+import nuvio.composeapp.generated.resources.compose_player_close
++import nuvio.composeapp.generated.resources.action_close
 +import org.jetbrains.compose.resources.stringResource
 +
 +/** A bounded, opaque track sheet; the existing scaffold owns scrim taps and Back. */
@@ -428,7 +958,7 @@ index 0000000000000000000000000000000000000000..0ba52ea857d103136908c8e0a678a65e
 +                        overflow = TextOverflow.Ellipsis,
 +                    )
 +                    IconButton(onClick = onDismiss) {
-+                        Icon(Icons.Rounded.Close, stringResource(Res.string.compose_player_close))
++                        Icon(Icons.Rounded.Close, stringResource(Res.string.action_close))
 +                    }
 +                }
 +                content()
@@ -454,7 +984,7 @@ index 0000000000000000000000000000000000000000..0ba52ea857d103136908c8e0a678a65e
 +    }
 +}
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt
-index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cbfe6ee0f7 100644
+index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f99a37974c 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt
 @@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
@@ -474,7 +1004,15 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
  import androidx.compose.material.icons.rounded.Speed
  import androidx.compose.material.icons.rounded.SwapHoriz
  import androidx.compose.material.icons.rounded.Tv
-@@ -95,6 +98,7 @@ internal fun PlayerControlsShell(
+@@ -50,6 +53,7 @@ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
+ import androidx.compose.ui.Alignment
++import androidx.compose.ui.layout.onSizeChanged
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.graphics.graphicsLayer
+@@ -95,6 +99,7 @@ internal fun PlayerControlsShell(
      onSeekBack: () -> Unit,
      onSeekForward: () -> Unit,
      onResizeModeClick: () -> Unit,
@@ -482,7 +1020,15 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
      onSpeedClick: (() -> Unit)? = null,
      onSubtitleClick: (() -> Unit)? = null,
      onAudioClick: (() -> Unit)? = null,
-@@ -170,6 +174,7 @@ internal fun PlayerControlsShell(
+@@ -114,6 +119,7 @@ internal fun PlayerControlsShell(
+     onScrubChange: (Long) -> Unit,
+     onScrubFinished: (Long) -> Unit,
+     horizontalSafePadding: androidx.compose.ui.unit.Dp,
++    onHeaderHeightChanged: (Int) -> Unit = {},
+     modifier: Modifier = Modifier,
+ ) {
+     Box(modifier = modifier.fillMaxSize()) {
+@@ -170,11 +176,13 @@ internal fun PlayerControlsShell(
                  onVideoSettingsClick = onVideoSettingsClick,
                  onPictureInPictureClick = onPictureInPictureClick,
                  onInfoClick = onInfoClick,
@@ -490,7 +1036,13 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                  onOpenInExternalPlayer = onOpenInExternalPlayer,
                  onBack = onBack,
                  modifier = Modifier
-@@ -217,6 +222,7 @@ internal fun PlayerControlsShell(
+                     .align(Alignment.TopStart)
+                     .fillMaxWidth()
++                    .onSizeChanged { onHeaderHeightChanged(it.height) }
+                     .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
+                     .padding(
+                         start = metrics.horizontalPadding,
+@@ -217,6 +225,7 @@ internal fun PlayerControlsShell(
                          .align(Alignment.BottomCenter)
                          .fillMaxWidth()
                          .padding(horizontal = metrics.horizontalPadding)
@@ -498,7 +1050,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                          .padding(bottom = metrics.sliderBottomOffset),
                  )
              }
-@@ -224,6 +230,7 @@ internal fun PlayerControlsShell(
+@@ -224,6 +233,7 @@ internal fun PlayerControlsShell(
      }
  }
  
@@ -506,7 +1058,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
  @Composable
  private fun PlayerHeader(
      title: String,
-@@ -243,6 +250,7 @@ private fun PlayerHeader(
+@@ -243,6 +253,7 @@ private fun PlayerHeader(
      onVideoSettingsClick: (() -> Unit)?,
      onPictureInPictureClick: (() -> Unit)?,
      onInfoClick: (() -> Unit)?,
@@ -514,7 +1066,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
      onOpenInExternalPlayer: (() -> Unit)?,
      onBack: () -> Unit,
      modifier: Modifier = Modifier,
-@@ -254,13 +262,14 @@ private fun PlayerHeader(
+@@ -254,13 +265,14 @@ private fun PlayerHeader(
          label = "playerHeaderMetadataAlpha",
      )
      Column(modifier = modifier) {
@@ -532,7 +1084,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
              ) {
                  Column(
                      modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
-@@ -330,15 +339,19 @@ private fun PlayerHeader(
+@@ -330,15 +342,19 @@ private fun PlayerHeader(
              }
  
              if (showActions) {
@@ -556,7 +1108,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                              iconSize = metrics.headerIconSize,
                              onClick = onSubmitIntroClick,
                          )
-@@ -347,7 +360,7 @@ private fun PlayerHeader(
+@@ -347,7 +363,7 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.AutoMirrored.Rounded.OpenInNew,
                              contentDescription = stringResource(Res.string.streams_open_external_player),
@@ -565,7 +1117,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                              iconSize = metrics.headerIconSize,
                              onClick = onOpenInExternalPlayer,
                          )
-@@ -359,7 +372,7 @@ private fun PlayerHeader(
+@@ -359,7 +375,7 @@ private fun PlayerHeader(
                          } else {
                              stringResource(Res.string.compose_player_lock_controls)
                          },
@@ -574,7 +1126,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                          iconSize = metrics.headerIconSize,
                          onClick = onLockToggle,
                      )
-@@ -367,7 +380,7 @@ private fun PlayerHeader(
+@@ -367,7 +383,7 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.Rounded.Build,
                              contentDescription = stringResource(Res.string.player_action_video_settings),
@@ -583,7 +1135,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                              iconSize = metrics.headerIconSize,
                              onClick = onVideoSettingsClick,
                          )
-@@ -376,7 +389,7 @@ private fun PlayerHeader(
+@@ -376,7 +392,7 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.Rounded.PictureInPictureAlt,
                              contentDescription = "Picture in Picture",
@@ -592,7 +1144,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                              iconSize = metrics.headerIconSize,
                              onClick = onPictureInPictureClick,
                          )
-@@ -385,16 +398,25 @@ private fun PlayerHeader(
+@@ -385,16 +401,25 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.Rounded.Info,
                              contentDescription = stringResource(Res.string.compose_player_playback_info),
@@ -620,7 +1172,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
                          iconSize = metrics.headerIconSize,
                          contentDescription = stringResource(Res.string.compose_player_close),
                      )
-@@ -526,6 +548,7 @@ private fun PlayPauseControlButton(
+@@ -526,6 +551,7 @@ private fun PlayPauseControlButton(
      }
  }
  
@@ -628,7 +1180,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..d83d4f72e73bab1e12b120600ce4e8cb
  @Composable
  private fun ProgressControls(
      playbackSnapshot: PlayerPlaybackSnapshot,
-@@ -599,10 +622,10 @@ private fun ProgressControls(
+@@ -599,10 +625,10 @@ private fun ProgressControls(
                      shape = RoundedCornerShape(24.dp),
                  ),
              ) {
@@ -714,6 +1266,48 @@ index 0000000000000000000000000000000000000000..cf7bb21d780a43cafc17c385c09e4eef
 +    val orientationToRemember: PlayerOrientation?
 +        get() = sessionOverride.takeIf { preference == PlayerOrientationPreference.RememberLastUsed }
 +}
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOverlayScaffold.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOverlayScaffold.kt
+index 211630b4ba48356db44421869d1dee71cd062a68..70daf3efa95021c57e2ad58c95582023bdcbeae6 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOverlayScaffold.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOverlayScaffold.kt
+@@ -39,17 +39,16 @@ internal fun PlayerOverlayScaffold(
+         val interactionSource = remember { MutableInteractionSource() }
+ 
+         Box(
+-            modifier = Modifier
+-                .fillMaxSize()
+-                .clickable(
+-                    interactionSource = interactionSource,
+-                    indication = null,
+-                    onClick = onDismiss,
+-                ),
++            modifier = Modifier.fillMaxSize(),
+         ) {
+             Box(
+                 modifier = Modifier
+                     .fillMaxSize()
++                    .clickable(
++                        interactionSource = interactionSource,
++                        indication = null,
++                        onClick = onDismiss,
++                    )
+                     .drawWithCache {
+                         val horizontalGradient = Brush.horizontalGradient(
+                             listOf(Color.Black.copy(alpha = 0.88f), Color.Transparent),
+@@ -68,7 +67,12 @@ internal fun PlayerOverlayScaffold(
+                             drawRect(verticalGradient)
+                         }
+                     }
+-                    .padding(contentPadding),
++                ,
++            )
++            // Keep dismissal on a sibling scrim so its click semantics cannot swallow
++            // track/style content or make the whole sheet a single accessibility node.
++            Box(
++                modifier = Modifier.fillMaxSize().padding(contentPadding),
+                 content = content,
+             )
+         }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt
 index 1b8754ce96187d0317d37fa0857921ee2362cc45..5d0682a49df09cc0c21349c8eb069a1a60eb2021 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt
@@ -730,6 +1324,80 @@ index 1b8754ce96187d0317d37fa0857921ee2362cc45..5d0682a49df09cc0c21349c8eb069a1a
  
  @Composable
  expect fun EnterImmersivePlayerMode(keepScreenAwake: Boolean)
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt
+index 3885453c4e4445673bb38d0b6569382ad7f91e97..b8efcca8d4c419db0514b50bd987f4103544ec2c 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt
+@@ -43,6 +43,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
+     p2pRebufferMessage: String?,
+     p2pRebufferProgress: Float?,
+     currentGestureFeedback: GestureFeedbackState?,
++    controlsHeaderHeight: Dp = 0.dp,
+     renderedGestureFeedback: GestureFeedbackState?,
+     initialLoadCompleted: Boolean,
+     pausedOverlayVisible: Boolean,
+@@ -106,26 +107,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
+             .padding(top = 58.dp),
+     )
+ 
+-    AnimatedVisibility(
+-        visible = currentGestureFeedback != null,
+-        enter = fadeIn(),
+-        exit = fadeOut(),
+-    ) {
+-        Box(
+-            modifier = Modifier.fillMaxSize(),
+-        ) {
+-            renderedGestureFeedback?.let { feedback ->
+-                GestureFeedbackPill(
+-                    feedback = feedback,
+-                    modifier = Modifier
+-                        .align(Alignment.TopCenter)
+-                        .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
+-                        .padding(horizontal = horizontalSafePadding)
+-                        .padding(top = 40.dp),
+-                )
+-            }
+-        }
+-    }
++    PlayerGestureFeedbackOverlay(currentGestureFeedback, renderedGestureFeedback, horizontalSafePadding, controlsHeaderHeight)
+ 
+     if (!playerControlsLocked) {
+         SkipIntroButton(
+@@ -165,3 +147,33 @@ internal fun BoxScope.PlayerPlaybackOverlays(
+         )
+     }
+ }
++
++@Composable
++internal fun PlayerGestureFeedbackOverlay(
++    currentGestureFeedback: GestureFeedbackState?,
++    renderedGestureFeedback: GestureFeedbackState?,
++    horizontalSafePadding: Dp,
++    controlsHeaderHeight: Dp,
++) {
++    AnimatedVisibility(
++        visible = currentGestureFeedback != null,
++        enter = fadeIn(),
++        exit = fadeOut(),
++    ) {
++        Box(
++            modifier = Modifier.fillMaxSize(),
++        ) {
++            renderedGestureFeedback?.let { feedback ->
++                GestureFeedbackPill(
++                    feedback = feedback,
++                    modifier = Modifier
++                        .align(Alignment.TopCenter)
++                        .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
++                        .padding(horizontal = horizontalSafePadding)
++                        .padding(top = maxOf(40.dp, controlsHeaderHeight + 8.dp)),
++                )
++            }
++        }
++    }
++
++}
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt
 index c5e72a9989eb45f6218cf4e1252ad365f7c52076..60bee1481b24b3e70d57f76115d57cd6ea321800 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt
@@ -767,28 +1435,48 @@ index c5e72a9989eb45f6218cf4e1252ad365f7c52076..60bee1481b24b3e70d57f76115d57cd6
      }
  }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt
-index 7a333bd4cd6643b0e06399d22bc4b4a625be13ed..4ac9cbe72d1446a8b5c30b29f8ca91a6077fa8cc 100644
+index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed94cb44b15 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt
-@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
+@@ -11,6 +11,12 @@ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.derivedStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.dp
+ import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.focus.FocusRequester
+@@ -24,8 +30,9 @@ import kotlinx.coroutines.launch
  import nuvio.composeapp.generated.resources.*
  
  @Composable
 -internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
 +internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Unit)? = null) {
      val runtime = this
++    var controlsHeaderHeight by remember { mutableStateOf(0.dp) }
      val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
      val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
-@@ -293,7 +293,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
+     val currentGestureFeedback = liveGestureFeedback ?: gestureFeedback
+@@ -293,11 +300,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
              )
          }
  
 -        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode)
-+        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen)
++        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it })
          RenderPlaybackOverlays(
              runtime = runtime,
              displayedPositionMs = displayedPositionMs,
-@@ -327,10 +327,15 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
+             currentGestureFeedback = currentGestureFeedback,
++            controlsHeaderHeight = controlsHeaderHeight,
+             p2pInitialLoadingMessage = p2pInitialLoadingMessage,
+             p2pInitialLoadingProgress = p2pInitialLoadingProgress,
+             showP2pRebufferStats = showP2pRebufferStats,
+@@ -327,10 +335,17 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
  }
  
  @Composable
@@ -797,16 +1485,18 @@ index 7a333bd4cd6643b0e06399d22bc4b4a625be13ed..4ac9cbe72d1446a8b5c30b29f8ca91a6
 +    displayedPositionMs: Long,
 +    isEpisode: Boolean,
 +    onRotateScreen: (() -> Unit)?,
++    onHeaderHeightChanged: (Dp) -> Unit,
 +) {
++    val density = LocalDensity.current
      val isInPip = rememberIsInPictureInPicture()
-+    val compactTrackModalOpen = metrics.compactControls && (showAudioModal || showSubtitleModal)
++    val trackModalOpen = showAudioModal || showSubtitleModal
      AnimatedVisibility(
 -        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
-+        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !compactTrackModalOpen,
++        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !trackModalOpen,
          enter = fadeIn(),
          exit = fadeOut(),
      ) {
-@@ -359,6 +364,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
+@@ -359,6 +374,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
              onSeekBack = { seekBy(-10_000L) },
              onSeekForward = { seekBy(10_000L) },
              onResizeModeClick = { cycleResizeMode() },
@@ -819,7 +1509,33 @@ index 7a333bd4cd6643b0e06399d22bc4b4a625be13ed..4ac9cbe72d1446a8b5c30b29f8ca91a6
              onSpeedClick = if (!isLiveTvPlayback) {
                  {
                      cyclePlaybackSpeed()
-@@ -637,9 +648,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+@@ -479,6 +500,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
+                 scheduleProgressSyncAfterSeek()
+             },
+             horizontalSafePadding = horizontalSafePadding,
++            onHeaderHeightChanged = { height -> onHeaderHeightChanged(with(density) { height.toDp() }) },
+             modifier = Modifier.fillMaxSize(),
+         )
+     }
+@@ -489,6 +511,7 @@ private fun BoxScope.RenderPlaybackOverlays(
+     runtime: PlayerScreenRuntime,
+     displayedPositionMs: Long,
+     currentGestureFeedback: GestureFeedbackState?,
++    controlsHeaderHeight: Dp,
+     p2pInitialLoadingMessage: String?,
+     p2pInitialLoadingProgress: Float?,
+     showP2pRebufferStats: Boolean,
+@@ -517,7 +540,8 @@ private fun BoxScope.RenderPlaybackOverlays(
+         showP2pRebufferStats = showP2pRebufferStats,
+         p2pRebufferMessage = p2pRebufferMessage,
+         p2pRebufferProgress = p2pRebufferProgress,
+-        currentGestureFeedback = currentGestureFeedback,
++        currentGestureFeedback = currentGestureFeedback.takeUnless { isAnyOverlayVisible },
++        controlsHeaderHeight = if (controlsVisible && !playerControlsLocked) controlsHeaderHeight else 0.dp,
+         renderedGestureFeedback = renderedGestureFeedback,
+         initialLoadCompleted = initialLoadCompleted,
+         pausedOverlayVisible = pausedOverlayVisible,
+@@ -638,9 +662,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
              scope.launch {
                  kotlinx.coroutines.delay(200)
                  showAudioModal = false
@@ -834,7 +1550,7 @@ index 7a333bd4cd6643b0e06399d22bc4b4a625be13ed..4ac9cbe72d1446a8b5c30b29f8ca91a6
          showSubtitleModal = showSubtitleModal,
          subtitleTracks = subtitleTracks,
          selectedSubtitleIndex = selectedSubtitleIndex,
-@@ -682,7 +697,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+@@ -683,7 +711,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
          onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
          onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
          onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
@@ -847,7 +1563,7 @@ index 7a333bd4cd6643b0e06399d22bc4b4a625be13ed..4ac9cbe72d1446a8b5c30b29f8ca91a6
          playerSettings = playerSettingsUiState,
          onVideoSettingsChanged = {
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt
-index 58786700f7b1a048522584b2ab0628c45188e133..f5c85fb06758622b3bc28a934f73c79981839b60 100644
+index 66c26c8bae8e007aeacfbd1dee6b7a17ecda7836..23389fb8f52b3f09fa51bc844a46a5e748cd343f 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt
 @@ -34,6 +34,8 @@ fun snapToAllowedTimeout(value: Int): Int {
@@ -936,10 +1652,53 @@ index 81525b55d4efd986555592efc7ba8a827cb137a0..d5cc5aa3e179a2b8f92cc1b279fbef1b
      fun saveResizeMode(mode: String)
      fun loadHoldToSpeedEnabled(): Boolean?
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt
-index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2592bf572 100644
+index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a81744448b 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt
-@@ -163,155 +163,206 @@ fun SubtitleModal(
+@@ -32,12 +32,15 @@ import androidx.compose.material.icons.rounded.Check
+ import androidx.compose.material.icons.rounded.CloudDownload
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.TextButton
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.saveable.rememberSaveable
++import androidx.compose.ui.platform.testTag
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+@@ -124,6 +127,7 @@ fun SubtitleModal(
+                 ?: SubtitleOffLanguageKey,
+         )
+     }
++    var compactPage by rememberSaveable(visible) { mutableStateOf("tracks") }
+     var pendingOptionId by remember(visible) { mutableStateOf<String?>(playbackOptionId) }
+     val options = remember(activeLanguageKey, subtitleStructureKey, addonStructureKey) {
+         buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, addonSubtitles)
+@@ -135,18 +139,6 @@ fun SubtitleModal(
+     val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
+         selectedOptionId != null && options.any { it.id == selectedOptionId }
+ 
+-    LaunchedEffect(visible) {
+-        if (!visible) return@LaunchedEffect
+-        val languageIndex = languageItems.indexOfFirst { it.key == activeLanguageKey }
+-        if (languageIndex >= 0) {
+-            languageListState.scrollItemIntoViewIfNeeded(languageIndex)
+-        }
+-        val optionId = selectedOptionId ?: return@LaunchedEffect
+-        val optionIndex = options.indexOfFirst { it.id == optionId }
+-        if (optionIndex >= 0) {
+-            optionsListState.scrollItemIntoViewIfNeeded(optionIndex)
+-        }
+-    }
+ 
+     LaunchedEffect(languageItems) {
+         if (languageItems.none { it.key == activeLanguageKey }) {
+@@ -163,155 +155,255 @@ fun SubtitleModal(
          }
      }
  
@@ -994,6 +1753,19 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
 -                    verticalAlignment = Alignment.Top,
 +    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
 +        val compact = maxWidth < 600.dp
++        // Only scroll a list that is actually composed. Waiting on the hidden language
++        // list in portrait would suspend before the selected track could be revealed.
++        LaunchedEffect(visible, compact, compactPage, activeLanguageKey, selectedOptionId, options.size) {
++            if (!visible) return@LaunchedEffect
++            if (!compact || compactPage == "languages") {
++                val index = languageItems.indexOfFirst { it.key == activeLanguageKey }
++                if (index >= 0) languageListState.scrollItemIntoViewIfNeeded(index)
++            }
++            if (!compact || compactPage == "tracks") {
++                val index = options.indexOfFirst { it.id == selectedOptionId }
++                if (index >= 0) optionsListState.scrollItemIntoViewIfNeeded(index)
++            }
++        }
 +        PlayerOverlayScaffold(
 +            visible = visible,
 +            onDismiss = onDismiss,
@@ -1008,21 +1780,53 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
 -                    SubtitleRail(
 -                        title = stringResource(Res.string.compose_player_languages),
 -                        width = 200.dp,
-+                    LazyColumn(
-+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
-+                        verticalArrangement = Arrangement.spacedBy(4.dp),
-+                        contentPadding = PaddingValues(vertical = 8.dp),
-                     ) {
+-                    ) {
 -                        LazyColumn(
--                            state = languageListState,
++                    // Navigation stays outside the scrolling content, regardless of track count.
++                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
++                        TextButton(
++                            onClick = { compactPage = "languages" },
++                            modifier = Modifier.weight(1f).testTag("subtitle-language-picker"),
++                        ) {
++                            Text(
++                                text = when (activeLanguageKey) {
++                                    SubtitleOffLanguageKey -> stringResource(Res.string.compose_player_languages)
++                                    SubtitleUnknownLanguageKey -> stringResource(Res.string.subtitle_language_unknown)
++                                    else -> languageLabelForCode(activeLanguageKey)
++                                },
++                                maxLines = 2,
++                            )
++                        }
++                        TextButton(
++                            onClick = {
++                                languageItems.firstOrNull { it.key == SubtitleOffLanguageKey }?.let(selectLanguage)
++                                compactPage = "tracks"
++                            },
++                            modifier = Modifier.testTag("subtitle-off"),
++                        ) { Text(stringResource(Res.string.compose_player_none)) }
++                    }
++                    Row(Modifier.fillMaxWidth()) {
++                        TextButton(
++                            onClick = { compactPage = "tracks" },
++                            modifier = Modifier.weight(1f).testTag("subtitle-tracks-tab"),
++                        ) { Text(stringResource(Res.string.compose_player_subtitles)) }
++                        TextButton(
++                            onClick = { compactPage = "style" },
++                            modifier = Modifier.weight(1f).testTag("subtitle-style-tab"),
++                        ) { Text(stringResource(Res.string.compose_player_style)) }
++                    }
++                    when (compactPage) {
++                        "languages" -> LazyColumn(
+                             state = languageListState,
 -                            modifier = Modifier.heightIn(max = railMaxHeight),
 -                            verticalArrangement = Arrangement.spacedBy(4.dp),
--                            contentPadding = PaddingValues(vertical = 8.dp),
--                        ) {
--                            items(languageItems, key = { it.key }) { item ->
--                                SubtitleLanguageRow(
--                                    item = item,
--                                    selected = item.key == activeLanguageKey,
++                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).testTag("subtitle-languages"),
+                             contentPadding = PaddingValues(vertical = 8.dp),
+                         ) {
+                             items(languageItems, key = { it.key }) { item ->
+                                 SubtitleLanguageRow(
+                                     item = item,
+                                     selected = item.key == activeLanguageKey,
 -                                    onClick = {
 -                                        activeLanguageKey = item.key
 -                                        val availableOptions = buildSubtitleSelectionOptions(
@@ -1037,62 +1841,80 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
 -                                            onBuiltInTrackSelected(-1)
 -                                        }
 -                                    },
-+                        item(key = "languages-heading") {
-+                            CompactTrackSectionTitle(stringResource(Res.string.compose_player_languages))
-+                        }
-+                        items(languageItems, key = { "language:${it.key}" }) { item ->
-+                            SubtitleLanguageRow(
-+                                item = item,
-+                                selected = item.key == activeLanguageKey,
-+                                onClick = { selectLanguage(item) },
-+                            )
-+                        }
-+                        item(key = "subtitles-heading") {
-+                            CompactTrackSectionTitle(stringResource(Res.string.compose_player_subtitles))
-+                        }
-+                        if (options.isEmpty()) {
-+                            item(key = "subtitles-empty") {
-+                                SubtitleOptionsEmptyState(
-+                                    activeLanguageKey = activeLanguageKey,
-+                                    hasAvailableLanguages = languageItems.size > 1,
-+                                    isLoadingAddonSubtitles = isLoadingAddonSubtitles,
-+                                    onFetchAddonSubtitles = onFetchAddonSubtitles,
-+                                )
-+                            }
-+                        }
-+                        items(keyedOptions, key = { "option:${it.lazyKey}" }) { keyedOption ->
-+                            val option = keyedOption.value
-+                            SubtitleOptionRow(
-+                                option = option,
-+                                selected = option.id == selectedOptionId,
-+                                onClick = { selectOption(option) },
-+                            )
-+                        }
-+                        if (styleVisible) {
-+                            item(key = "style") {
-+                                CompactTrackSectionTitle(stringResource(Res.string.compose_player_style))
-+                                SubtitleStylePanel(
-+                                    style = subtitleStyle,
-+                                    subtitleDelayMs = subtitleDelayMs,
-+                                    selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
-+                                    subtitleAutoSyncState = subtitleAutoSyncState,
-+                                    isCompact = true,
-+                                    showHeader = false,
-+                                    onStyleChanged = onStyleChanged,
-+                                    onSubtitleDelayChanged = onSubtitleDelayChanged,
-+                                    onSubtitleDelayReset = onSubtitleDelayReset,
-+                                    onAutoSyncCapture = onAutoSyncCapture,
-+                                    onAutoSyncCueSelected = onAutoSyncCueSelected,
-+                                    onAutoSyncReload = onAutoSyncReload,
-+                                    wrapControls = true,
++                                    onClick = { selectLanguage(item); compactPage = "tracks" },
                                  )
                              }
                          }
-                     }
+-                    }
+-
+-                    SubtitleRail(
+-                        title = stringResource(Res.string.compose_player_subtitles),
+-                        width = 300.dp,
+-                    ) {
+-                        when {
+-                            options.isEmpty() -> {
+-                                when (
+-                                    subtitleOptionsRailEmptyContent(
+-                                        selectedLanguageKey = activeLanguageKey,
++                        "style" -> Column(
++                            Modifier.fillMaxWidth().weight(1f, fill = false)
++                                .verticalScroll(rememberScrollState()).testTag("subtitle-style"),
++                        ) {
++                            SubtitleStylePanel(
++                                style = subtitleStyle,
++                                subtitleDelayMs = subtitleDelayMs,
++                                selectedAddonSubtitle = effectiveSelectedAddonSubtitle,
++                                subtitleAutoSyncState = subtitleAutoSyncState,
++                                isCompact = true,
++                                showHeader = false,
++                                onStyleChanged = onStyleChanged,
++                                onSubtitleDelayChanged = onSubtitleDelayChanged,
++                                onSubtitleDelayReset = onSubtitleDelayReset,
++                                onAutoSyncCapture = onAutoSyncCapture,
++                                onAutoSyncCueSelected = onAutoSyncCueSelected,
++                                onAutoSyncReload = onAutoSyncReload,
++                                wrapControls = true,
++                            )
++                        }
++                        else -> LazyColumn(
++                            state = optionsListState,
++                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).testTag("subtitle-options"),
++                            verticalArrangement = Arrangement.spacedBy(4.dp),
++                            contentPadding = PaddingValues(vertical = 8.dp),
++                        ) {
++                            if (options.isEmpty()) {
++                                item(key = "subtitles-empty") {
++                                    SubtitleOptionsEmptyState(
++                                        activeLanguageKey = activeLanguageKey,
+                                         hasAvailableLanguages = languageItems.size > 1,
+                                         isLoadingAddonSubtitles = isLoadingAddonSubtitles,
++                                        onFetchAddonSubtitles = onFetchAddonSubtitles,
+                                     )
+-                                ) {
+-                                    SubtitleOptionsRailEmptyContent.NONE -> {
+-                                        SubtitleRailEmptyState(
+-                                            text = stringResource(Res.string.compose_player_none),
+-                                        )
+-                                    }
++                                }
++                            }
++                            items(keyedOptions, key = { it.lazyKey }) { keyedOption ->
++                                val option = keyedOption.value
++                                SubtitleOptionRow(
++                                    option = option,
++                                    selected = option.id == selectedOptionId,
++                                    onClick = { selectOption(option) },
++                                )
++                            }
++                        }
++                    }
 +                }
 +            } else BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
 +                val railMaxHeight = (maxHeight - 72.dp).coerceAtLeast(120.dp)
-+
+ 
+-                                    SubtitleOptionsRailEmptyContent.LOADING -> {
+-                                        PlayerModalLoading(modifier = Modifier.padding(vertical = 24.dp))
+-                                    }
 +                Column(
 +                    modifier = Modifier.align(Alignment.BottomStart),
 +                    verticalArrangement = Arrangement.Bottom,
@@ -1104,21 +1926,17 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
 +                        modifier = Modifier.padding(bottom = 12.dp),
 +                    )
  
--                    SubtitleRail(
--                        title = stringResource(Res.string.compose_player_subtitles),
--                        width = 300.dp,
+-                                    SubtitleOptionsRailEmptyContent.FETCH -> {
+-                                        SubtitleRailEmptyState(
+-                                            text = stringResource(Res.string.compose_player_fetch_subtitles),
+-                                            onClick = onFetchAddonSubtitles,
+-                                        )
+-                                    }
 +                    Row(
 +                        modifier = Modifier.horizontalScroll(rememberScrollState()),
 +                        horizontalArrangement = Arrangement.spacedBy(14.dp),
 +                        verticalAlignment = Alignment.Top,
-                     ) {
--                        when {
--                            options.isEmpty() -> {
--                                when (
--                                    subtitleOptionsRailEmptyContent(
--                                        selectedLanguageKey = activeLanguageKey,
--                                        hasAvailableLanguages = languageItems.size > 1,
--                                        isLoadingAddonSubtitles = isLoadingAddonSubtitles,
++                    ) {
 +                        SubtitleRail(
 +                            title = stringResource(Res.string.compose_player_languages),
 +                            width = 200.dp,
@@ -1134,24 +1952,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
 +                                        item = item,
 +                                        selected = item.key == activeLanguageKey,
 +                                        onClick = { selectLanguage(item) },
-                                     )
--                                ) {
--                                    SubtitleOptionsRailEmptyContent.NONE -> {
--                                        SubtitleRailEmptyState(
--                                            text = stringResource(Res.string.compose_player_none),
--                                        )
--                                    }
--
--                                    SubtitleOptionsRailEmptyContent.LOADING -> {
--                                        PlayerModalLoading(modifier = Modifier.padding(vertical = 24.dp))
--                                    }
--
--                                    SubtitleOptionsRailEmptyContent.FETCH -> {
--                                        SubtitleRailEmptyState(
--                                            text = stringResource(Res.string.compose_player_fetch_subtitles),
--                                            onClick = onFetchAddonSubtitles,
--                                        )
--                                    }
++                                    )
                                  }
                              }
 +                        }
@@ -1273,7 +2074,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
                              }
                          }
                      }
-@@ -321,6 +372,39 @@ fun SubtitleModal(
+@@ -321,6 +413,39 @@ fun SubtitleModal(
      }
  }
  
@@ -1313,7 +2114,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..90e50152c7a9cf51cc97cb8ecda47ad2
  @Composable
  private fun SubtitleRail(
      title: String,
-@@ -531,8 +615,11 @@ private fun SubtitleRailEmptyState(
+@@ -531,8 +656,11 @@ private fun SubtitleRailEmptyState(
          }
          Text(
              text = text,
@@ -1451,6 +2252,383 @@ index dd1f5b329e1b19441c6f9eb168eb48e333970697..c6b4d450d71608b977bc6072adfa720b
  
          when {
              selectedAddonSubtitle == null -> {
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchBrowseContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchBrowseContent.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..0004c309b5bcbaf837039c8baa8833f56a31ee82
+--- /dev/null
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchBrowseContent.kt
+@@ -0,0 +1,137 @@
++package com.nuvio.app.features.search
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.lazy.LazyListScope
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.rounded.Close
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.saveable.rememberSaveable
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import com.nuvio.app.core.ui.nuvioConsumePointerEvents
++import nuvio.composeapp.generated.resources.Res
++import nuvio.composeapp.generated.resources.compose_search_recent_searches
++import nuvio.composeapp.generated.resources.compose_search_remove_recent_search
++import nuvio.composeapp.generated.resources.search_history_show_all
++import nuvio.composeapp.generated.resources.search_history_show_less
++import org.jetbrains.compose.resources.stringResource
++
++/** Keep history before Discover so pinned filters stay adjacent to their results. */
++internal fun LazyListScope.searchBrowseHeader(
++    recentSearches: List<String>,
++    onSearchPress: (String) -> Unit,
++    onRemoveSearch: (String) -> Unit,
++    filters: @Composable () -> Unit,
++) {
++    if (recentSearches.isNotEmpty()) {
++        item(key = "recent_searches") {
++            SearchRecentSection(recentSearches, onSearchPress, onRemoveSearch)
++        }
++    }
++    item(key = "discover_heading") {
++        DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
++    }
++    stickyHeader(key = "discover_filters") {
++        Box(modifier = Modifier.fillMaxWidth()) {
++            Box(
++                modifier = Modifier.matchParentSize()
++                    .background(MaterialTheme.colorScheme.background)
++                    .nuvioConsumePointerEvents(),
++            )
++            filters()
++        }
++    }
++}
++
++@Composable
++internal fun SearchRecentSection(
++    recentSearches: List<String>,
++    onSearchPress: (String) -> Unit,
++    onRemoveSearch: (String) -> Unit,
++    modifier: Modifier = Modifier,
++) {
++    var expanded by rememberSaveable { mutableStateOf(false) }
++    val visibleSearches = if (expanded) recentSearches else recentSearches.take(3)
++    Column(
++        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
++        verticalArrangement = Arrangement.spacedBy(4.dp),
++    ) {
++        Text(
++            text = stringResource(Res.string.compose_search_recent_searches),
++            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
++            color = MaterialTheme.colorScheme.onBackground,
++        )
++        Spacer(modifier = Modifier.height(4.dp))
++        visibleSearches.forEach { recentQuery ->
++            SearchRecentRow(
++                query = recentQuery,
++                onSearchPress = { onSearchPress(recentQuery) },
++                onRemovePress = { onRemoveSearch(recentQuery) },
++            )
++        }
++        if (recentSearches.size > 3) {
++            TextButton(onClick = { expanded = !expanded }) {
++                Text(
++                    text = if (expanded) stringResource(Res.string.search_history_show_less)
++                    else stringResource(Res.string.search_history_show_all, recentSearches.size),
++                )
++            }
++        }
++        Spacer(modifier = Modifier.height(6.dp))
++    }
++}
++
++@Composable
++private fun SearchRecentRow(
++    query: String,
++    onSearchPress: () -> Unit,
++    onRemovePress: () -> Unit,
++) {
++    Row(
++        modifier = Modifier.fillMaxWidth()
++            .clickable(role = Role.Button, onClick = onSearchPress)
++            .padding(vertical = 2.dp)
++            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(16.dp))
++            .padding(start = 2.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
++        horizontalArrangement = Arrangement.spacedBy(8.dp),
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        Text(
++            text = query,
++            modifier = Modifier.weight(1f),
++            style = MaterialTheme.typography.bodyLarge,
++            color = MaterialTheme.colorScheme.onBackground,
++            maxLines = 1,
++            overflow = TextOverflow.Ellipsis,
++        )
++        IconButton(onClick = onRemovePress) {
++            Icon(
++                imageVector = Icons.Rounded.Close,
++                contentDescription = stringResource(Res.string.compose_search_remove_recent_search),
++                tint = MaterialTheme.colorScheme.onSurfaceVariant,
++            )
++        }
++    }
++}
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt
+index 95f354cfcc3eb635e021392f72b14ee21cbe70dc..ce93a3cd83159c6015ffdf95901897156d062f9b 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt
+@@ -112,7 +112,7 @@ internal fun DiscoverSectionHeader(modifier: Modifier = Modifier) {
+     Text(
+         text = stringResource(Res.string.compose_search_discover_title),
+         modifier = modifier,
+-        style = MaterialTheme.typography.displaySmall,
++        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+         color = MaterialTheme.colorScheme.onBackground,
+     )
+ }
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt
+index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d417ba9281f 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt
+@@ -1,18 +1,12 @@
+ package com.nuvio.app.features.search
+ 
+-import androidx.compose.foundation.clickable
+-import androidx.compose.foundation.background
+-import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.BoxWithConstraints
+ import androidx.compose.foundation.layout.Column
+-import androidx.compose.foundation.layout.Row
+-import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.padding
+-import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.foundation.lazy.LazyListState
+ import androidx.compose.foundation.lazy.rememberLazyListState
+@@ -21,10 +15,8 @@ import androidx.compose.material.icons.rounded.Close
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.IconButton
+ import androidx.compose.material3.MaterialTheme
+-import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+-import androidx.compose.runtime.derivedStateOf
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
+@@ -32,11 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
+ import androidx.compose.runtime.snapshotFlow
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Modifier
+-import androidx.compose.ui.Alignment
+ import androidx.compose.ui.focus.FocusRequester
+ import androidx.compose.ui.focus.focusRequester
+-import androidx.compose.ui.text.font.FontWeight
+-import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
+ import com.nuvio.app.core.network.NetworkCondition
+@@ -45,7 +34,6 @@ import com.nuvio.app.core.ui.NuvioInputField
+ import com.nuvio.app.core.ui.NuvioScreen
+ import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
+ import com.nuvio.app.core.ui.NuvioScreenHeader
+-import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+ import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
+ import com.nuvio.app.features.addons.AddonRepository
+ import com.nuvio.app.features.addons.firstEnabledManifestError
+@@ -69,7 +57,6 @@ import nuvio.composeapp.generated.resources.Res
+ import nuvio.composeapp.generated.resources.action_retry
+ import nuvio.composeapp.generated.resources.compose_nav_search
+ import nuvio.composeapp.generated.resources.compose_search_clear
+-import nuvio.composeapp.generated.resources.compose_search_discover_title
+ import nuvio.composeapp.generated.resources.compose_search_empty_failed_message
+ import nuvio.composeapp.generated.resources.compose_search_empty_failed_title
+ import nuvio.composeapp.generated.resources.compose_search_empty_no_active_addons_message
+@@ -79,8 +66,6 @@ import nuvio.composeapp.generated.resources.compose_search_empty_no_results_titl
+ import nuvio.composeapp.generated.resources.compose_search_empty_no_search_catalogs_message
+ import nuvio.composeapp.generated.resources.compose_search_empty_no_search_catalogs_title
+ import nuvio.composeapp.generated.resources.compose_search_placeholder
+-import nuvio.composeapp.generated.resources.compose_search_recent_searches
+-import nuvio.composeapp.generated.resources.compose_search_remove_recent_search
+ import org.jetbrains.compose.resources.stringResource
+ 
+ @Composable
+@@ -120,11 +105,6 @@ fun SearchScreen(
+     var query by rememberSaveable { mutableStateOf("") }
+     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
+     var observedOfflineState by remember { mutableStateOf(false) }
+-    val discoverInFocus by remember(query, listState) {
+-        derivedStateOf {
+-            query.isBlank() && listState.firstVisibleItemIndex > 0
+-        }
+-    }
+ 
+     LaunchedEffect(scrollToTopRequests) {
+         scrollToTopRequests.collect {
+@@ -221,11 +201,7 @@ fun SearchScreen(
+         val homeSectionPadding = remember(maxWidth) {
+             homeSectionHorizontalPaddingForWidth(maxWidth.value)
+         }
+-        val headerTitle = when {
+-            query.isNotBlank() -> stringResource(Res.string.compose_nav_search)
+-            discoverInFocus -> stringResource(Res.string.compose_search_discover_title)
+-            else -> stringResource(Res.string.compose_nav_search)
+-        }
++        val headerTitle = stringResource(Res.string.compose_nav_search)
+ 
+         androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
+             Box(modifier = Modifier.fillMaxWidth()) {
+@@ -270,38 +246,20 @@ fun SearchScreen(
+                 modifier = Modifier.weight(1f),
+             ) {
+                 if (query.isBlank()) {
+-                    item {
+-                        DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
+-                    }
+-                    stickyHeader {
+-                        Box(modifier = Modifier.fillMaxWidth()) {
+-                            Box(
+-                                modifier = Modifier
+-                                    .matchParentSize()
+-                                    .background(MaterialTheme.colorScheme.background)
+-                                    .nuvioConsumePointerEvents(),
+-                            )
+-                            DiscoverFilterRow(
+-                                state = discoverUiState,
+-                                modifier = Modifier
+-                                    .padding(horizontal = 16.dp)
+-                                    .padding(top = 8.dp, bottom = 14.dp),
+-                                onTypeSelected = SearchRepository::selectDiscoverType,
+-                                onCatalogSelected = SearchRepository::selectDiscoverCatalog,
+-                                onGenreSelected = SearchRepository::selectDiscoverGenre,
+-                            )
+-                        }
+-                    }
+-                }
+-                if (query.isBlank()) {
+-                    if (recentSearches.isNotEmpty()) {
+-                        item(key = "recent_searches") {
+-                            SearchRecentSection(
+-                                recentSearches = recentSearches,
+-                                onSearchPress = { recentQuery -> query = recentQuery },
+-                                onRemoveSearch = SearchHistoryRepository::removeSearch,
+-                            )
+-                        }
++                    searchBrowseHeader(
++                        recentSearches = recentSearches,
++                        onSearchPress = { recentQuery -> query = recentQuery },
++                        onRemoveSearch = SearchHistoryRepository::removeSearch,
++                    ) {
++                        DiscoverFilterRow(
++                            state = discoverUiState,
++                            modifier = Modifier
++                                .padding(horizontal = 16.dp)
++                                .padding(top = 8.dp, bottom = 14.dp),
++                            onTypeSelected = SearchRepository::selectDiscoverType,
++                            onCatalogSelected = SearchRepository::selectDiscoverCatalog,
++                            onGenreSelected = SearchRepository::selectDiscoverGenre,
++                        )
+                     }
+                     discoverContent(
+                         state = discoverUiState,
+@@ -459,71 +417,3 @@ private fun SearchEmptyStateCard(
+         onActionClick = if (reason == SearchEmptyStateReason.RequestFailed) onRetry else null,
+     )
+ }
+-
+-@Composable
+-private fun SearchRecentSection(
+-    recentSearches: List<String>,
+-    onSearchPress: (String) -> Unit,
+-    onRemoveSearch: (String) -> Unit,
+-    modifier: Modifier = Modifier,
+-) {
+-    Column(
+-        modifier = modifier
+-            .fillMaxWidth()
+-            .padding(horizontal = 16.dp, vertical = 4.dp),
+-        verticalArrangement = Arrangement.spacedBy(4.dp),
+-    ) {
+-        Text(
+-            text = stringResource(Res.string.compose_search_recent_searches),
+-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+-            color = MaterialTheme.colorScheme.onBackground,
+-        )
+-        Spacer(modifier = Modifier.height(4.dp))
+-        recentSearches.forEach { recentQuery ->
+-            SearchRecentRow(
+-                query = recentQuery,
+-                onSearchPress = { onSearchPress(recentQuery) },
+-                onRemovePress = { onRemoveSearch(recentQuery) },
+-            )
+-        }
+-        Spacer(modifier = Modifier.height(6.dp))
+-    }
+-}
+-
+-@Composable
+-private fun SearchRecentRow(
+-    query: String,
+-    onSearchPress: () -> Unit,
+-    onRemovePress: () -> Unit,
+-    modifier: Modifier = Modifier,
+-) {
+-    Row(
+-        modifier = modifier
+-            .fillMaxWidth()
+-            .clickable(onClick = onSearchPress)
+-            .padding(vertical = 2.dp)
+-            .background(
+-                color = MaterialTheme.colorScheme.background,
+-                shape = RoundedCornerShape(16.dp),
+-            )
+-            .padding(start = 2.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+-        verticalAlignment = Alignment.CenterVertically,
+-    ) {
+-        Text(
+-            text = query,
+-            modifier = Modifier.weight(1f),
+-            style = MaterialTheme.typography.bodyLarge,
+-            color = MaterialTheme.colorScheme.onBackground,
+-            maxLines = 1,
+-            overflow = TextOverflow.Ellipsis,
+-        )
+-        IconButton(onClick = onRemovePress) {
+-            Icon(
+-                imageVector = Icons.Rounded.Close,
+-                contentDescription = stringResource(Res.string.compose_search_remove_recent_search),
+-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+-            )
+-        }
+-    }
+-}
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt
 index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68acd711aad 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt
@@ -1529,6 +2707,19 @@ index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68a
 +        PlayerOrientationPreference.AlwaysPortrait -> Res.string.settings_player_orientation_portrait_description
 +        PlayerOrientationPreference.FollowDevice -> Res.string.settings_player_orientation_device_description
 +    }
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt
+index ebd9d8dfe31ae2f8fe520f59e3e63cf071da017f..b5f9640eeb8ff3f406a2f5db86bfa9aacec583e0 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt
+@@ -759,7 +759,7 @@ internal fun settingsSearchEntries(
+         PlaybackSearchRow("home-hero", stringResource(Res.string.settings_homescreen_show_hero), stringResource(Res.string.settings_homescreen_show_hero_description)),
+         PlaybackSearchRow("home-catalog-type", stringResource(Res.string.layout_catalog_type), stringResource(Res.string.layout_catalog_type_sub)),
+         PlaybackSearchRow("home-hide-unreleased", stringResource(Res.string.layout_hide_unreleased), stringResource(Res.string.layout_hide_unreleased_sub)),
+-        PlaybackSearchRow("home-hero-sources", stringResource(Res.string.settings_homescreen_section_hero_sources)),
++        PlaybackSearchRow("home-hero-sources", stringResource(Res.string.settings_homescreen_catalogs_source)),
+         PlaybackSearchRow("home-catalogs", stringResource(Res.string.settings_homescreen_section_catalogs)),
+     ).forEach { row ->
+         addRow(
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt
 index ef4a8311459bec57b542d4aaecf775fd9b4a6f2c..cb5673bd43ca10047d4c4a95cec5440506adcbc8 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt
