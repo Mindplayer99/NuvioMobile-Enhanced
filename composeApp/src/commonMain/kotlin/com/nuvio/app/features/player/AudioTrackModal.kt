@@ -44,51 +44,82 @@ fun AudioTrackModal(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PlayerOverlayScaffold(
-        visible = visible,
-        onDismiss = onDismiss,
-        modifier = modifier,
-        contentPadding = PaddingValues(start = 44.dp, end = 44.dp, top = 28.dp, bottom = 64.dp),
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val railWidth = minOf(maxWidth, 444.dp)
-            val railMaxHeight = (maxHeight - 64.dp).coerceAtLeast(120.dp).coerceAtMost(620.dp)
-
-            Column(
-                modifier = Modifier
-                    .width(railWidth)
-                    .fillMaxHeight()
-                    .align(Alignment.BottomStart),
-                verticalArrangement = Arrangement.Bottom,
-            ) {
-                Text(
-                    text = stringResource(Res.string.compose_player_audio_tracks),
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-
-                if (audioTracks.isEmpty()) {
-                    Text(
-                        text = stringResource(Res.string.compose_player_no_audio_tracks_available),
-                        color = Color.White.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
-                    )
-                } else {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val compact = maxWidth < 600.dp
+        PlayerOverlayScaffold(
+            visible = visible,
+            onDismiss = onDismiss,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = if (compact) PaddingValues() else PaddingValues(start = 44.dp, end = 44.dp, top = 28.dp, bottom = 64.dp),
+        ) {
+            if (compact) {
+                CompactPlayerTrackSheet(
+                    title = stringResource(Res.string.compose_player_audio_tracks),
+                    onDismiss = onDismiss,
+                ) {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = railMaxHeight),
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(vertical = 8.dp),
                     ) {
+                        if (audioTracks.isEmpty()) {
+                            item {
+                                Text(
+                                    text = stringResource(Res.string.compose_player_no_audio_tracks_available),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        }
                         items(audioTracks, key = { "${it.index}:${it.id}" }) { track ->
                             AudioTrackRow(
                                 track = track,
                                 isSelected = track.index == selectedIndex,
                                 onClick = { onTrackSelected(track.index) },
                             )
+                        }
+                    }
+                }
+            } else BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val railWidth = minOf(maxWidth, 444.dp)
+                val railMaxHeight = (maxHeight - 64.dp).coerceAtLeast(120.dp).coerceAtMost(620.dp)
+
+                Column(
+                    modifier = Modifier
+                        .width(railWidth)
+                        .fillMaxHeight()
+                        .align(Alignment.BottomStart),
+                    verticalArrangement = Arrangement.Bottom,
+                ) {
+                    Text(
+                        text = stringResource(Res.string.compose_player_audio_tracks),
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+
+                    if (audioTracks.isEmpty()) {
+                        Text(
+                            text = stringResource(Res.string.compose_player_no_audio_tracks_available),
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = railMaxHeight),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                        ) {
+                            items(audioTracks, key = { "${it.index}:${it.id}" }) { track ->
+                                AudioTrackRow(
+                                    track = track,
+                                    isSelected = track.index == selectedIndex,
+                                    onClick = { onTrackSelected(track.index) },
+                                )
+                            }
                         }
                     }
                 }
@@ -129,8 +160,8 @@ private fun AudioTrackRow(
                 text = localizedTrackDisplayName(track.label, track.language, track.index),
                 color = primaryColor,
                 style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                // Preserve the complete codec, channels and role in long track labels.
+                softWrap = true,
             )
             track.language?.takeIf { it.isNotBlank() && it != "und" }?.let { language ->
                 Text(

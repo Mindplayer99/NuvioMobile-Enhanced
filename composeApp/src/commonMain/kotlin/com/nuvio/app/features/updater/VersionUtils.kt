@@ -71,8 +71,8 @@ internal object VersionUtils {
     fun isPrerelease(raw: String?): Boolean = parse(raw)?.prerelease?.isNotEmpty() == true
 
     fun isRemoteNewer(remote: String?, local: String?): Boolean {
-        val remoteVersion = parse(remote) ?: return false
-        val localVersion = parse(local) ?: return false
+        val remoteVersion = parse(remote?.removeSuffix("-orientation")) ?: return false
+        val localVersion = parse(local?.removeSuffix("-orientation")) ?: return false
         return remoteVersion > localVersion
     }
 }

@@ -19,6 +19,18 @@ private const val unlockPlayerOrientationNotification = "NuvioPlayerUnlockOrient
 private var playerLandscapeLockCount = 0
 
 @Composable
+actual fun KeepPlayerOrientationUntilExit(settings: PlayerSettingsUiState) = LockPlayerToLandscape()
+
+@Composable
+actual fun rememberPlayerOrientationControl(
+    sessionKey: String,
+    settings: PlayerSettingsUiState,
+): (() -> Unit)? {
+    LockPlayerToLandscape()
+    return null
+}
+
+@Composable
 actual fun LockPlayerToLandscape() {
     DisposableEffect(Unit) {
         playerLandscapeLockCount += 1

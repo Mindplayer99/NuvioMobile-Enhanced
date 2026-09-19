@@ -19,6 +19,15 @@ data class PlayerAudioLevel(
 expect fun LockPlayerToLandscape()
 
 @Composable
+expect fun KeepPlayerOrientationUntilExit(settings: PlayerSettingsUiState)
+
+@Composable
+expect fun rememberPlayerOrientationControl(
+    sessionKey: String,
+    settings: PlayerSettingsUiState,
+): (() -> Unit)?
+
+@Composable
 expect fun FullscreenPlayerDialog(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,

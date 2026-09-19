@@ -136,6 +136,14 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
             runtime.lastSyncedSettingsResizeMode = playerSettingsUiState.resizeMode
         }
         runtime.resetIdentityStateIfNeeded()
+        val onRotateScreen = rememberPlayerOrientationControl(
+            // Track content, not the URL: quality/source changes stay in this session.
+            sessionKey = listOf(
+                args.profileId, args.parentMetaType, args.parentMetaId,
+                runtime.activeVideoId, runtime.activeSeasonNumber, runtime.activeEpisodeNumber,
+            ).joinToString(":"),
+            settings = playerSettingsUiState,
+        )
 
         val keepScreenAwake = runtime.errorMessage == null &&
             (runtime.playbackSnapshot.isPlaying ||
@@ -149,6 +157,6 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
             ),
         )
         runtime.BindPlayerRuntimeEffects()
-        runtime.RenderPlayerRuntimeUi()
+        runtime.RenderPlayerRuntimeUi(onRotateScreen = onRotateScreen)
     }
 }

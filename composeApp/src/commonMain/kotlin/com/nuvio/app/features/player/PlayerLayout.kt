@@ -17,6 +17,7 @@ import org.jetbrains.compose.resources.StringResource
 import kotlin.math.max
 
 internal data class PlayerLayoutMetrics(
+    val compactControls: Boolean = false,
     val horizontalPadding: Dp,
     val verticalPadding: Dp,
     val titleSize: TextUnit,
@@ -92,6 +93,7 @@ internal data class PlayerLayoutMetrics(
                     playIconSize = 38.dp,
                 )
                 else -> PlayerLayoutMetrics(
+                    compactControls = width < 600.dp,
                     horizontalPadding = 20.dp,
                     verticalPadding = 16.dp,
                     titleSize = 18.dp.value.sp,
