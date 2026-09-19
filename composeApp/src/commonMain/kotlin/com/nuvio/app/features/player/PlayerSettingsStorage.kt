@@ -11,6 +11,10 @@ internal expect object PlayerSettingsStorage {
     fun savePauseOverlayEnabled(enabled: Boolean)
     fun loadShowParentalGuide(): Boolean?
     fun saveShowParentalGuide(enabled: Boolean)
+    fun loadOrientationPreference(): String?
+    fun saveOrientationPreference(preference: String)
+    fun loadLastPlayerOrientation(): String?
+    fun saveLastPlayerOrientation(orientation: String)
     fun loadResizeMode(): String?
     fun saveResizeMode(mode: String)
     fun loadHoldToSpeedEnabled(): Boolean?

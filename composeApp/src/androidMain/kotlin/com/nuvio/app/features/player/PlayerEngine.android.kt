@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
@@ -243,6 +244,7 @@ private fun ExoPlayerSurface(
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
 ) {
+    val captionBottomInsetPx = with(LocalDensity.current) { LocalPlayerCaptionBottomInset.current.roundToPx() }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
@@ -1156,6 +1158,7 @@ private fun ExoPlayerSurface(
                 keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                 this.resizeMode = resizeMode.toExoResizeMode()
                 setShutterBackgroundColor(android.graphics.Color.BLACK)
+                installPortraitSubtitleViewport(captionBottomInsetPx)
                 playerViewRef = this
                 sidecarController.bindSubtitleView(this.subtitleView)
                 syncLibassOverlay(
@@ -1170,6 +1173,7 @@ private fun ExoPlayerSurface(
             playerView.player = exoPlayer
             playerView.useController = useNativeController
             playerView.resizeMode = resizeMode.toExoResizeMode()
+            playerView.updatePortraitCaptionBottomInset(captionBottomInsetPx)
             playerViewRef = playerView
             sidecarController.bindSubtitleView(playerView.subtitleView)
             syncPlayerViewKeepScreenOn()
@@ -1457,11 +1461,13 @@ private fun LibmpvPlayerSurface(
                     InAppLogger.error("MPV/Android", "Failed to initialize libmpv: ${error.localizedMessage ?: error::class.simpleName.orEmpty()}")
                     latestOnError.value(error.localizedMessage ?: "libmpv unavailable")
                 }
+                addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applySubtitleViewport() }
                 playerViewRef = this
             }
         },
         update = { view ->
             playerViewRef = view
+            view.applySubtitleViewport()
             view.applyResizeMode(resizeMode)
         },
         onRelease = { view ->
@@ -1812,6 +1818,20 @@ private class NuvioLibmpvView(
                     }
                 }.getOrDefault("unavailable")
             }
+        }
+    }
+
+    private var lastPortraitSubtitleViewport: Boolean? = null
+
+    fun applySubtitleViewport() {
+        if (width <= 0 || height <= 0) return
+        val portrait = height > width
+        if (lastPortraitSubtitleViewport == portrait) return
+        lastPortraitSubtitleViewport = portrait
+        executeMpv {
+            // Keep plain-text captions on the picture in portrait. Preserve landscape defaults
+            // and authored ASS positions; do not force ASS style overrides.
+            mpv.setPropertyBoolean("sub-use-margins", !portrait)
         }
     }
 
@@ -2887,6 +2907,11 @@ private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
 }
 
 private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
+    // The portrait SubtitleView already occupies the visible video rectangle. Remapping PGS cues
+    // into a second fitted rectangle would apply letterboxing twice.
+    if (height > width && getTag(androidx.media3.ui.R.id.exo_subtitles) != null) {
+        return RectF(0f, 0f, 1f, 1f)
+    }
     val subtitleView = this.subtitleView ?: return null
     val viewWidth = subtitleView.width.toFloat()
     val viewHeight = subtitleView.height.toFloat()

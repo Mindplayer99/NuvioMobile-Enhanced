@@ -158,6 +158,8 @@ class NextEpisodeCardTest {
                 val noop = rememberUpdatedState<() -> Unit>({})
                 Box(
                     modifier = Modifier.size(640.dp, 360.dp).playerSurfaceDragGestures(
+                        playerController = null,
+                        swipeToSeekEnabledState = rememberUpdatedState(true),
                         gestureController = null,
                         layoutSize = IntSize(640, 360),
                         playbackGesturesEnabled = true,

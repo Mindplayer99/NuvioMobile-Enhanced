@@ -8,9 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -24,8 +31,10 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 
 @Composable
-internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
+internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Unit)? = null) {
     val runtime = this
+    var controlsHeaderHeight by remember { mutableStateOf(0.dp) }
+    var controlsFooterHeight by remember(layoutSize) { mutableStateOf(0.dp) }
     val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
     val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
     val currentGestureFeedback = liveGestureFeedback ?: gestureFeedback
@@ -232,48 +241,51 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
         val initialPositionRequestKey = currentInitialPositionRequestKey()
         if (playerSurfaceSourceUrl != null) {
-            PlatformPlayerSurface(
-                sourceUrl = playerSurfaceSourceUrl,
-                sourceAudioUrl = activeSourceAudioUrl,
-                sourceHeaders = activeSourceHeaders,
-                sourceResponseHeaders = activeSourceResponseHeaders,
-                externalSubtitles = externalSubtitles,
-                streamType = activeStreamType,
-                modifier = Modifier.fillMaxSize(),
-                playWhenReady = shouldPlay,
-                initialPositionMs = activeInitialPositionMs.takeIf { it > 0L },
-                initialPositionRequestKey = initialPositionRequestKey,
-                resizeMode = resizeMode,
-                onInitialPositionHandled = { key, handled ->
-                    if (key == currentInitialPositionRequestKey()) {
-                        initialSeekApplied = handled
-                    }
-                },
-                onControllerReady = { controller ->
-                    playerController = controller
-                    playerControllerSourceUrl = playerSurfaceSourceUrl
-                },
-                onSnapshot = { snapshot ->
-                    playbackSnapshot = snapshot
-                    checkAutoSubtitleRewindWatermark(snapshot.positionMs)
-                    refreshAudioTracksIfChanged()
-                    if (!snapshot.isLoading) initialLoadCompleted = true
-                    if (snapshot.isEnded) {
-                        shouldPlay = false
-                        controlsVisible = !playerControlsLocked
-                    }
-                },
-                onError = { message ->
-                    if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
-                        return@PlatformPlayerSurface
-                    }
-                    errorMessage = message
-                    if (message != null) {
-                        controlsVisible = !playerControlsLocked
-                        removeFailedStreamFromCache()
-                    }
-                },
-            )
+            CompositionLocalProvider(LocalPlayerCaptionBottomInset provides
+                if (metrics.compactControls) controlsFooterHeight + 8.dp else 0.dp) {
+                PlatformPlayerSurface(
+                    sourceUrl = playerSurfaceSourceUrl,
+                    sourceAudioUrl = activeSourceAudioUrl,
+                    sourceHeaders = activeSourceHeaders,
+                    sourceResponseHeaders = activeSourceResponseHeaders,
+                    externalSubtitles = externalSubtitles,
+                    streamType = activeStreamType,
+                    modifier = Modifier.fillMaxSize(),
+                    playWhenReady = shouldPlay,
+                    initialPositionMs = activeInitialPositionMs.takeIf { it > 0L },
+                    initialPositionRequestKey = initialPositionRequestKey,
+                    resizeMode = resizeMode,
+                    onInitialPositionHandled = { key, handled ->
+                        if (key == currentInitialPositionRequestKey()) {
+                            initialSeekApplied = handled
+                        }
+                    },
+                    onControllerReady = { controller ->
+                        playerController = controller
+                        playerControllerSourceUrl = playerSurfaceSourceUrl
+                    },
+                    onSnapshot = { snapshot ->
+                        playbackSnapshot = snapshot
+                        checkAutoSubtitleRewindWatermark(snapshot.positionMs)
+                        refreshAudioTracksIfChanged()
+                        if (!snapshot.isLoading) initialLoadCompleted = true
+                        if (snapshot.isEnded) {
+                            shouldPlay = false
+                            controlsVisible = !playerControlsLocked
+                        }
+                    },
+                    onError = { message ->
+                        if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
+                            return@PlatformPlayerSurface
+                        }
+                        errorMessage = message
+                        if (message != null) {
+                            controlsVisible = !playerControlsLocked
+                            removeFailedStreamFromCache()
+                        }
+                    },
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -296,11 +308,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             )
         }
 
-        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode)
+        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it }, onFooterHeightChanged = { controlsFooterHeight = it })
         RenderPlaybackOverlays(
             runtime = runtime,
             displayedPositionMs = displayedPositionMs,
             currentGestureFeedback = currentGestureFeedback,
+            controlsHeaderHeight = controlsHeaderHeight,
             p2pInitialLoadingMessage = p2pInitialLoadingMessage,
             p2pInitialLoadingProgress = p2pInitialLoadingProgress,
             showP2pRebufferStats = showP2pRebufferStats,
@@ -330,10 +343,18 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
 }
 
 @Composable
-private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, isEpisode: Boolean) {
+private fun PlayerScreenRuntime.RenderPlayerControls(
+    displayedPositionMs: Long,
+    isEpisode: Boolean,
+    onRotateScreen: (() -> Unit)?,
+    onHeaderHeightChanged: (Dp) -> Unit,
+    onFooterHeightChanged: (Dp) -> Unit,
+) {
+    val density = LocalDensity.current
     val isInPip = rememberIsInPictureInPicture()
+    val trackModalOpen = showAudioModal || showSubtitleModal
     AnimatedVisibility(
-        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
+        visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip && !trackModalOpen,
         enter = fadeIn(),
         exit = fadeOut(),
     ) {
@@ -362,6 +383,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onSeekBack = { seekBy(-10_000L) },
             onSeekForward = { seekBy(10_000L) },
             onResizeModeClick = { cycleResizeMode() },
+            onRotateScreen = onRotateScreen?.let { rotate ->
+                {
+                    rotate()
+                    controlsVisible = true
+                }
+            },
             onSpeedClick = if (!isLiveTvPlayback) {
                 {
                     cyclePlaybackSpeed()
@@ -482,6 +509,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
                 scheduleProgressSyncAfterSeek()
             },
             horizontalSafePadding = horizontalSafePadding,
+            onHeaderHeightChanged = { height -> onHeaderHeightChanged(with(density) { height.toDp() }) },
+            onFooterHeightChanged = { height -> onFooterHeightChanged(with(density) { height.toDp() }) },
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -492,6 +521,7 @@ private fun BoxScope.RenderPlaybackOverlays(
     runtime: PlayerScreenRuntime,
     displayedPositionMs: Long,
     currentGestureFeedback: GestureFeedbackState?,
+    controlsHeaderHeight: Dp,
     p2pInitialLoadingMessage: String?,
     p2pInitialLoadingProgress: Float?,
     showP2pRebufferStats: Boolean,
@@ -526,7 +556,8 @@ private fun BoxScope.RenderPlaybackOverlays(
         showP2pRebufferStats = showP2pRebufferStats,
         p2pRebufferMessage = p2pRebufferMessage,
         p2pRebufferProgress = p2pRebufferProgress,
-        currentGestureFeedback = currentGestureFeedback,
+        currentGestureFeedback = currentGestureFeedback.takeUnless { isAnyOverlayVisible },
+        controlsHeaderHeight = if (controlsVisible && !playerControlsLocked) controlsHeaderHeight else 0.dp,
         renderedGestureFeedback = renderedGestureFeedback,
         initialLoadCompleted = initialLoadCompleted,
         pausedOverlayVisible = pausedOverlayVisible,
@@ -647,9 +678,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             scope.launch {
                 kotlinx.coroutines.delay(200)
                 showAudioModal = false
+                if (metrics.compactControls) controlsVisible = true
             }
         },
-        onAudioModalDismissed = { showAudioModal = false },
+        onAudioModalDismissed = {
+            showAudioModal = false
+            if (metrics.compactControls) controlsVisible = true
+        },
         showSubtitleModal = showSubtitleModal,
         subtitleTracks = subtitleTracks,
         selectedSubtitleIndex = selectedSubtitleIndex,
@@ -692,7 +727,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
         onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
         onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
-        onSubtitleModalDismissed = { showSubtitleModal = false },
+        onSubtitleModalDismissed = {
+            showSubtitleModal = false
+            if (metrics.compactControls) controlsVisible = true
+        },
         showVideoSettingsModal = showVideoSettingsModal,
         playerSettings = playerSettingsUiState,
         onVideoSettingsChanged = {

@@ -68,6 +68,8 @@ class PlayerSurfaceGesturesTest {
                         revealLockedOverlayState = noop,
                     )
                     .playerSurfaceDragGestures(
+                        playerController = null,
+                        swipeToSeekEnabledState = rememberUpdatedState(true),
                         gestureController = gestureController,
                         layoutSize = IntSize(320, 180),
                         playbackGesturesEnabled = playbackReady.value,

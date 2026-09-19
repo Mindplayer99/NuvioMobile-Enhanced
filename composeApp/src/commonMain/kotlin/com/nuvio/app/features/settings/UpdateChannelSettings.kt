@@ -36,12 +36,15 @@ import org.jetbrains.compose.resources.stringResource
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun UpdateChannelSettingsRow(isTablet: Boolean) {
-    val channel by UpdatePreferences.shared.channel.collectAsState()
+    val channel = UpdateChannel.STABLE
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        UpdatePreferences.shared.setChannel(UpdateChannel.STABLE)
+    }
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val tokens = MaterialTheme.nuvio
     SettingsNavigationRow(
         title = stringResource(Res.string.updates_channel_title),
-        description = stringResource(Res.string.updates_channel_description),
+        description = stringResource(Res.string.orientation_updates_stable_description),
         icon = Icons.Rounded.SystemUpdate,
         isTablet = isTablet,
         trailingContent = {
@@ -59,7 +62,7 @@ internal fun UpdateChannelSettingsRow(isTablet: Boolean) {
                 Column(
                     modifier = Modifier.selectableGroup().verticalScroll(rememberScrollState()),
                 ) {
-                    UpdateChannel.entries.forEach { option ->
+                    listOf(UpdateChannel.STABLE).forEach { option ->
                         Row(
                             modifier = Modifier.fillMaxWidth().selectable(
                                 selected = option == channel,
