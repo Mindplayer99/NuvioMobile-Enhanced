@@ -9,7 +9,7 @@ import subprocess
 
 EXPECTED_AUTOMATION = '45a7c30c90289db3a95f4c7cac92b8bf2a01fb82'
 EXPECTED_UPSTREAM = '50b9194ce5ba7c06ff3709ec525087fa31ce4323'
-EXPECTED_SOURCE = '1efe80398144e4dc2ea9f84e9c0f3008056e3af5'
+EXPECTED_SOURCE = '6545296fb17f2be433ebe2288a23001c54bb8586'
 spec = importlib.util.spec_from_file_location('sync', Path(__file__).with_name('orientation-sync.py'))
 sync = importlib.util.module_from_spec(spec); spec.loader.exec_module(sync)
 
@@ -47,7 +47,8 @@ def main():
                      'Current branch did not advance after publication')
         paths = ['orientation/manifest.json', 'orientation/canonical.patch',
                  'scripts/orientation-tests.py', 'scripts/test-orientation-tests.py',
-                 'scripts/test-orientation-sync.py']
+                 'scripts/test-orientation-sync.py', 'scripts/orientation-release.py',
+                 'orientation/upstream-0.4.22-test-harness.patch', 'orientation/upstream-0.4.22-test-harness.json']
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             env = os.environ.copy(); env['GIT_INDEX_FILE'] = tmp + '/index'

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Critical tests first; shared full-suite/build; per-tag upstream equivalence."""
 import argparse
+from collections import Counter
 import hashlib
 import importlib.util
 import json
@@ -120,6 +121,65 @@ def artifact_results(run_id, commit, report):
     return cases
 
 
+# This is a version-pinned test API repair, never an exemption for compilation failures.
+HARNESS_COMMIT = '50b9194ce5ba7c06ff3709ec525087fa31ce4323'
+HARNESS_PATHS = (
+    'composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt',
+    'composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt',
+    'composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt',
+)
+
+
+def compiler_errors(log):
+    return [{'path': p, 'message': m.strip()} for p, m in re.findall(
+        r'e: file://[^\n]*?(composeApp/src/[^:\n]+):\d+:\d+ ([^\n]+)', log)]
+
+
+def check_harness_failure(commit, metadata, log, states, patch_bytes):
+    release.require(commit == HARNESS_COMMIT == metadata['upstream_commit'], 'Test harness repair is pinned to exact 0.4.22')
+    release.require(hashlib.sha256(patch_bytes).hexdigest() == metadata['patch_sha256'], 'Test harness patch hash mismatch')
+    actual = compiler_errors(log)
+    signatures = lambda errors: Counter((e['path'], e['message']) for e in errors)
+    release.require(signatures(actual) == signatures(metadata['expected_errors']), 'Untouched upstream compiler errors differ from reviewed test API failures')
+    release.require([s['path'] for s in states if s['failed']] == [':composeApp:compileAndroidHostTest'], 'Unexpected upstream failed task')
+    release.require('BUILD FAILED' in log, 'Missing upstream compilation failure evidence')
+    return actual
+
+
+def upstream_reference(raw, source, plan, report, evidence):
+    if plan['upstream_commit'] != HARNESS_COMMIT:
+        return run_tasks(raw, [TASK], report, 'upstream')
+    root = Path(__file__).resolve().parent.parent / 'orientation'
+    metadata = json.loads((root / 'upstream-0.4.22-test-harness.json').read_text())
+    patch_path = root / 'upstream-0.4.22-test-harness.patch'
+    patch_bytes = patch_path.read_bytes()
+    release.require(release.run('git', 'rev-parse', 'HEAD', cwd=raw).strip() == HARNESS_COMMIT, 'Wrong untouched upstream source')
+    try:
+        run_tasks(raw, [TASK], report, 'upstream-untouched')
+    except RuntimeError:
+        log = (report / 'upstream-untouched-gradle.log').read_text()
+        states = [json.loads(line) for line in (report / 'upstream-untouched-tasks.jsonl').read_text().splitlines()]
+        errors = check_harness_failure(plan['upstream_commit'], metadata, log, states, patch_bytes)
+    else:
+        raise RuntimeError('Untouched upstream compiled; reviewed harness repair no longer applies')
+    release.require(not release.run('git', 'status', '--porcelain', '--untracked-files=no', cwd=raw).strip(), 'Raw upstream changed during diagnostic')
+    candidate_patch = subprocess.check_output(['git', 'diff', '--binary', '--full-index', HARNESS_COMMIT, plan['commit'], '--', *HARNESS_PATHS], cwd=source)
+    release.require(candidate_patch == patch_bytes, 'Candidate and reference test harness differ')
+    release.run('git', 'apply', '--index', str(patch_path), cwd=raw)
+    changed = release.run('git', 'diff', '--cached', '--name-only', cwd=raw).splitlines()
+    release.require(sorted(changed) == sorted(HARNESS_PATHS), 'Test repair modified unexpected paths')
+    release.require(subprocess.check_output(['git', 'diff', '--cached', '--binary', '--full-index'], cwd=raw) == patch_bytes, 'Reference repair differs from pinned patch')
+    release.run('git', '-c', 'user.name=Orientation verification', '-c', 'user.email=orientation@users.noreply.github.com',
+                'commit', '-m', 'Adapt only 0.4.22 test calls to upstream APIs; preserve assertions', cwd=raw)
+    evidence['upstream_test_harness'] = {
+        'untouched_commit': HARNESS_COMMIT, 'untouched_compile_errors': errors,
+        'patch_sha256': metadata['patch_sha256'], 'test_only_paths': changed,
+        'reference_commit': release.run('git', 'rev-parse', 'HEAD', cwd=raw).strip(),
+        'runtime_unchanged': True,
+        'note': 'Untouched upstream cannot compile host tests. Comparison uses identical test-only API repairs in candidate and reference; assertions retained.'}
+    return run_tasks(raw, [TASK], report, 'upstream')
+
+
 def gate(source, plan_path, report, upstream_run=None):
     plan = json.loads(plan_path.read_text())
     report.mkdir(parents=True, exist_ok=True)
@@ -136,7 +196,7 @@ def gate(source, plan_path, report, upstream_run=None):
         candidate = run_tasks(source, [TASK, ASSEMBLE], report, 'candidate', ['--continue','-Pnuvio.android.abis=arm64-v8a'])
         critical(candidate)
         evidence['candidate_tests'] = len(candidate)
-        if any(x['status'] == 'failed' for x in candidate.values()):
+        if any(x['status'] == 'failed' for x in candidate.values()) or plan['upstream_commit'] == HARNESS_COMMIT:
             if upstream_run:
                 upstream = artifact_results(upstream_run, plan['upstream_commit'], report)
             else:
@@ -146,7 +206,7 @@ def gate(source, plan_path, report, upstream_run=None):
                 shutil.copyfile(source/'local.properties',raw/'local.properties')
                 (raw/'local.properties').chmod(0o600)
                 try:
-                    upstream = run_tasks(raw,[TASK],report,'upstream')
+                    upstream = upstream_reference(raw, source, plan, report, evidence)
                 finally:
                     (raw/'local.properties').unlink(missing_ok=True)
             evidence['upstream_tests'] = len(upstream)

@@ -22,6 +22,87 @@ index c8cbc3a17dcd423c0177dceca9920d960c2a3ca6..c08884594e61a059d12c90d81ad36cf8
              isUniversalApk = false
          }
      }
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt
+index 362a3b5730ff45d59d6c10b04e1f9aea4a3277f3..1a9a76592cda6498acad513efbed3fc7febc1388 100644
+--- a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt
+@@ -33,10 +33,10 @@ class AndroidDownloadTransferTest {
+             val directory = temporary.newFolder()
+             File(directory, "video.mkv.part").writeText("hello")
+ 
+-            val output = transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++            transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                 "\"version-1\"", onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+ 
+-            assertEquals("hello world", output.readText())
++            assertEquals("hello world", File(directory, "video.mkv.part").readText())
+             val request = server.takeRequest()
+             assertEquals("bytes=5-", request.getHeader("Range"))
+             assertEquals("\"version-1\"", request.getHeader("If-Range"))
+@@ -51,9 +51,9 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("new file"))
+             val directory = temporary.newFolder()
+             File(directory, "video.mkv.part").writeText("old prefix")
+-            val output = transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++            transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                 null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+-            assertEquals("new file", output.readText())
++            assertEquals("new file", File(directory, "video.mkv.part").readText())
+         }
+     }
+ 
+@@ -64,9 +64,9 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("replacement"))
+             val directory = temporary.newFolder()
+             File(directory, "video.mkv.part").writeText("old prefix")
+-            val output = transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++            transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                 null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+-            assertEquals("replacement", output.readText())
++            assertEquals("replacement", File(directory, "video.mkv.part").readText())
+             assertEquals("bytes=10-", server.takeRequest().getHeader("Range"))
+             assertNull(server.takeRequest().getHeader("Range"))
+         }
+@@ -79,7 +79,7 @@ class AndroidDownloadTransferTest {
+             val directory = temporary.newFolder()
+             val partial = File(directory, "video.mkv.part").apply { writeText("hello") }
+             assertFailsWith<IOException> {
+-                transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++                transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                     null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+             }
+             assertEquals("hello", partial.readText())
+@@ -92,7 +92,7 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("abcdefghij").setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY))
+             val directory = temporary.newFolder()
+             assertFailsWith<IOException> {
+-                transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++                transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                     null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+             }
+             assertFalse(File(directory, "video.mkv").exists())
+@@ -106,7 +106,7 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("abcdefghij").throttleBody(1, 10, TimeUnit.SECONDS))
+             val directory = temporary.newFolder()
+             val task = async(Dispatchers.Default) {
+-                transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++                transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                     null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+             }
+             withContext(Dispatchers.IO) { server.takeRequest(5, TimeUnit.SECONDS) }
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt
+index 9510eae365f252c5a52ecfe082e21668d35c5265..71b90c2f053cb446dd6465b7360958cd875995fc 100644
+--- a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt
+@@ -158,6 +158,8 @@ class NextEpisodeCardTest {
+                 val noop = rememberUpdatedState<() -> Unit>({})
+                 Box(
+                     modifier = Modifier.size(640.dp, 360.dp).playerSurfaceDragGestures(
++                        playerController = null,
++                        swipeToSeekEnabledState = rememberUpdatedState(true),
+                         gestureController = null,
+                         layoutSize = IntSize(640, 360),
+                         playbackGesturesEnabled = true,
 diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationAndroidTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationAndroidTest.kt
 new file mode 100644
 index 0000000000000000000000000000000000000000..12023c62461885cacfe4ccb2bb916f46d51e9a1d
@@ -289,6 +370,19 @@ index 0000000000000000000000000000000000000000..4d3b1067f5b01b3cca97016eb5ef8406
 +        path.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
 +    }
 +}
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt
+index a1735632911d8860a10929b1bc8de18dd710a761..abd6c364536b754fedff6cbf056a0a4747364cbe 100644
+--- a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt
+@@ -68,6 +68,8 @@ class PlayerSurfaceGesturesTest {
+                         revealLockedOverlayState = noop,
+                     )
+                     .playerSurfaceDragGestures(
++                        playerController = null,
++                        swipeToSeekEnabledState = rememberUpdatedState(true),
+                         gestureController = gestureController,
+                         layoutSize = IntSize(320, 180),
+                         playbackGesturesEnabled = playbackReady.value,
 diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt
 new file mode 100644
 index 0000000000000000000000000000000000000000..f517bf2705e43d7d37ec999d52db46cd436115d8

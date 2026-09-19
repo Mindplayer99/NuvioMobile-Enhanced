@@ -1,0 +1,58 @@
+{
+  "upstream_commit": "50b9194ce5ba7c06ff3709ec525087fa31ce4323",
+  "patch_sha256": "53a68fb5926058a9fbe0431c144ef12f296bc107e8152ecd590f846f0ce6733c",
+  "expected_errors": [
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "Argument type mismatch: actual type is 'File!', but 'DownloadSink' was expected."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "None of the following candidates is applicable:"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "Argument type mismatch: actual type is 'File!', but 'DownloadSink' was expected."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "None of the following candidates is applicable:"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "Argument type mismatch: actual type is 'File!', but 'DownloadSink' was expected."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "None of the following candidates is applicable:"
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "Argument type mismatch: actual type is 'File!', but 'DownloadSink' was expected."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "Argument type mismatch: actual type is 'File!', but 'DownloadSink' was expected."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
+      "message": "Argument type mismatch: actual type is 'File!', but 'DownloadSink' was expected."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt",
+      "message": "No value passed for parameter 'playerController'."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt",
+      "message": "No value passed for parameter 'swipeToSeekEnabledState'."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt",
+      "message": "No value passed for parameter 'playerController'."
+    },
+    {
+      "path": "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt",
+      "message": "No value passed for parameter 'swipeToSeekEnabledState'."
+    }
+  ]
+}

@@ -75,6 +75,7 @@ jobs:
             ${{ runner.temp }}/orientation-risk.json
             ${{ runner.temp }}/orientation-reports/*-xml/
             ${{ runner.temp }}/orientation-reports/*-gradle.log
+            ${{ runner.temp }}/orientation-reports/*-tasks.jsonl
             ${{ runner.temp }}/orientation-reports/test-evidence.json
             ${{ runner.temp }}/orientation-source/composeApp/build/reports/ui-polish/
           if-no-files-found: ignore
