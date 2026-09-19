@@ -115,7 +115,9 @@ def publish(source, version, apk, evidence=None):
                       "-F", "prerelease=false", "-f", "body=" +
                       "Built from the exact preserved source. Full ARM64 release; installed-app signer verified. " +
                       ("Critical tests and Full ARM64 build passed. Broad suite: " +
-                       (str(len(evidence['inherited_failures'])) + " failures reproduced on the exact untouched upstream; no added candidate failures. "
+                       (str(len(evidence['inherited_failures'])) + " failures reproduced on " +
+                        ("upstream with the documented test-only API repair" if evidence.get('upstream_test_harness') else "the exact untouched upstream") +
+                        "; no added candidate failures. "
                         if evidence and evidence['inherited_failures'] else "passed. ") +
                        "Real-device smoke testing remains required.\n\n") +
                       "Verification:\n```json\n" + json.dumps(record, indent=2) + "\n```")

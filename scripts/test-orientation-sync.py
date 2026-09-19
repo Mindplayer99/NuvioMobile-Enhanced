@@ -92,7 +92,7 @@ class IntegrationGateTests(unittest.TestCase):
 
     def test_canonical_patch_matches_saved_reviewed_source(self):
         m = sync.config()
-        self.assertEqual(m['base_tag'], '0.4.17')
+        self.assertEqual(m['base_tag'], '0.4.22')
         self.assertEqual(sync.reproduced_tree(m,m['base_commit']),sync.git('rev-parse',m['orientation_commit']+'^{tree}'))
         self.assertIn('androidApp/build.gradle.kts', m['delta_paths'])
 

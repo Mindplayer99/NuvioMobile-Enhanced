@@ -1,8 +1,8 @@
 diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
-index f4e6372443e1b61177923648312a86ab2b3bce93..f0e7165beec9cb2feea3de17622c04f1850d1bcb 100644
+index c8cbc3a17dcd423c0177dceca9920d960c2a3ca6..c08884594e61a059d12c90d81ad36cf89dde5dca 100644
 --- a/androidApp/build.gradle.kts
 +++ b/androidApp/build.gradle.kts
-@@ -47,6 +47,10 @@ val buildsReleaseApks = requestedTaskNames.any {
+@@ -48,6 +48,10 @@ val buildsReleaseApks = requestedTaskNames.any {
      it.startsWith("assemble", ignoreCase = true) && it.endsWith("Release", ignoreCase = true)
  }
  
@@ -13,7 +13,7 @@ index f4e6372443e1b61177923648312a86ab2b3bce93..f0e7165beec9cb2feea3de17622c04f1
  android {
      namespace = "com.nuvio.android"
      compileSdk = libs.versions.android.compileSdk.get().toInt()
-@@ -111,7 +115,7 @@ android {
+@@ -112,7 +116,7 @@ android {
          abi {
              isEnable = buildsReleaseApks
              reset()
@@ -22,6 +22,87 @@ index f4e6372443e1b61177923648312a86ab2b3bce93..f0e7165beec9cb2feea3de17622c04f1
              isUniversalApk = false
          }
      }
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt
+index 362a3b5730ff45d59d6c10b04e1f9aea4a3277f3..1a9a76592cda6498acad513efbed3fc7febc1388 100644
+--- a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt
+@@ -33,10 +33,10 @@ class AndroidDownloadTransferTest {
+             val directory = temporary.newFolder()
+             File(directory, "video.mkv.part").writeText("hello")
+ 
+-            val output = transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++            transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                 "\"version-1\"", onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+ 
+-            assertEquals("hello world", output.readText())
++            assertEquals("hello world", File(directory, "video.mkv.part").readText())
+             val request = server.takeRequest()
+             assertEquals("bytes=5-", request.getHeader("Range"))
+             assertEquals("\"version-1\"", request.getHeader("If-Range"))
+@@ -51,9 +51,9 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("new file"))
+             val directory = temporary.newFolder()
+             File(directory, "video.mkv.part").writeText("old prefix")
+-            val output = transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++            transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                 null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+-            assertEquals("new file", output.readText())
++            assertEquals("new file", File(directory, "video.mkv.part").readText())
+         }
+     }
+ 
+@@ -64,9 +64,9 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("replacement"))
+             val directory = temporary.newFolder()
+             File(directory, "video.mkv.part").writeText("old prefix")
+-            val output = transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++            transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                 null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+-            assertEquals("replacement", output.readText())
++            assertEquals("replacement", File(directory, "video.mkv.part").readText())
+             assertEquals("bytes=10-", server.takeRequest().getHeader("Range"))
+             assertNull(server.takeRequest().getHeader("Range"))
+         }
+@@ -79,7 +79,7 @@ class AndroidDownloadTransferTest {
+             val directory = temporary.newFolder()
+             val partial = File(directory, "video.mkv.part").apply { writeText("hello") }
+             assertFailsWith<IOException> {
+-                transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++                transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                     null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+             }
+             assertEquals("hello", partial.readText())
+@@ -92,7 +92,7 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("abcdefghij").setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY))
+             val directory = temporary.newFolder()
+             assertFailsWith<IOException> {
+-                transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++                transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                     null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+             }
+             assertFalse(File(directory, "video.mkv").exists())
+@@ -106,7 +106,7 @@ class AndroidDownloadTransferTest {
+             server.enqueue(MockResponse().setBody("abcdefghij").throttleBody(1, 10, TimeUnit.SECONDS))
+             val directory = temporary.newFolder()
+             val task = async(Dispatchers.Default) {
+-                transferAndroidDownload(downloadItem(server.url("/video").toString()), directory,
++                transferAndroidDownload(downloadItem(server.url("/video").toString()), FileDownloadSink(File(directory, "video.mkv.part")),
+                     null, onHeaders = { _, _ -> }, onProgress = { _, _ -> })
+             }
+             withContext(Dispatchers.IO) { server.takeRequest(5, TimeUnit.SECONDS) }
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt
+index 9510eae365f252c5a52ecfe082e21668d35c5265..71b90c2f053cb446dd6465b7360958cd875995fc 100644
+--- a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/NextEpisodeCardTest.kt
+@@ -158,6 +158,8 @@ class NextEpisodeCardTest {
+                 val noop = rememberUpdatedState<() -> Unit>({})
+                 Box(
+                     modifier = Modifier.size(640.dp, 360.dp).playerSurfaceDragGestures(
++                        playerController = null,
++                        swipeToSeekEnabledState = rememberUpdatedState(true),
+                         gestureController = null,
+                         layoutSize = IntSize(640, 360),
+                         playbackGesturesEnabled = true,
 diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationAndroidTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationAndroidTest.kt
 new file mode 100644
 index 0000000000000000000000000000000000000000..12023c62461885cacfe4ccb2bb916f46d51e9a1d
@@ -48,12 +129,77 @@ index 0000000000000000000000000000000000000000..12023c62461885cacfe4ccb2bb916f46
 +        assertEquals(ActivityInfo.SCREEN_ORIENTATION_USER, null.toAndroidRequestedOrientation())
 +    }
 +}
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationExitTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationExitTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f272e0785fb13cd16c15f4c9a6ad7fe1d8ea480
+--- /dev/null
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationExitTest.kt
+@@ -0,0 +1,59 @@
++package com.nuvio.app.features.player
++
++import android.app.Activity
++import android.content.Context
++import android.content.ContextWrapper
++import android.content.pm.ActivityInfo
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.test.junit4.createComposeRule
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import kotlin.test.assertEquals
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34], qualifiers = "w411dp-h891dp-mdpi")
++class PlayerOrientationExitTest {
++    @get:Rule val compose = createComposeRule()
++
++    @Test fun portraitRemainsUntilAnimatedDestinationExitsThenOriginalPolicyReturns() {
++        val host = mutableStateOf(true)
++        val child = mutableStateOf(true)
++        lateinit var activity: Activity
++        var original: Int? = null
++        compose.setContent {
++            var context: Context = LocalContext.current
++            while (context !is Activity) context = (context as ContextWrapper).baseContext
++            activity = context
++            if (original == null) original = activity.requestedOrientation
++            val settings = PlayerSettingsUiState(orientationPreference = PlayerOrientationPreference.AlwaysPortrait)
++            if (host.value) KeepPlayerOrientationUntilExit(settings)
++            if (child.value) rememberPlayerOrientationControl("movie", settings)
++        }
++        compose.runOnIdle { assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, activity.requestedOrientation); child.value = false }
++        compose.runOnIdle { assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, activity.requestedOrientation); host.value = false }
++        compose.runOnIdle { assertEquals(original, activity.requestedOrientation) }
++    }
++
++    @Test fun hostAndChildCanDisposeTogetherWithoutLeavingPortraitLocked() {
++        val visible = mutableStateOf(true)
++        lateinit var activity: Activity
++        var original: Int? = null
++        compose.setContent {
++            var context: Context = LocalContext.current
++            while (context !is Activity) context = (context as ContextWrapper).baseContext
++            activity = context
++            if (original == null) original = activity.requestedOrientation
++            if (visible.value) {
++                val settings = PlayerSettingsUiState(orientationPreference = PlayerOrientationPreference.AlwaysPortrait)
++                KeepPlayerOrientationUntilExit(settings)
++                rememberPlayerOrientationControl("movie", settings)
++            }
++        }
++        compose.runOnIdle { visible.value = false }
++        compose.runOnIdle { assertEquals(original, activity.requestedOrientation) }
++    }
++}
 diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..9128831929e7206ab6efdd8c4444b788e89f333d
+index 0000000000000000000000000000000000000000..4d3b1067f5b01b3cca97016eb5ef8406cb366f48
 --- /dev/null
 +++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,170 @@
 +package com.nuvio.app.features.player
 +
 +import android.graphics.Bitmap
@@ -111,6 +257,27 @@ index 0000000000000000000000000000000000000000..9128831929e7206ab6efdd8c4444b788
 +                )
 +            }
 +        }
++    }
++
++    @Test fun languageAndOffHaveEqualWidthAndTabsExposeSelection() {
++        compose.setContent { Subtitles() }
++        val language = compose.onNodeWithTag("subtitle-language-picker").fetchSemanticsNode().boundsInRoot
++        val off = compose.onNodeWithTag("subtitle-off").fetchSemanticsNode().boundsInRoot
++        assertTrue(kotlin.math.abs(language.width - off.width) < 1f)
++        compose.onNodeWithTag("subtitle-tracks-tab").assertIsSelected()
++        compose.onNodeWithTag("subtitle-style-tab").performClick().assertIsSelected()
++        compose.onNodeWithTag("subtitle-tracks-tab").assertIsNotSelected()
++        screenshot("portrait-tabs-selected")
++    }
++
++    @Test fun turningOffDoesNotMoveTheSheetHeader() {
++        compose.setContent { Subtitles() }
++        val before = compose.onNodeWithContentDescription("Close").fetchSemanticsNode().boundsInRoot
++        compose.onNodeWithTag("subtitle-off").performClick().assertIsSelected()
++        val after = compose.onNodeWithContentDescription("Close").fetchSemanticsNode().boundsInRoot
++        assertEquals(before, after)
++        compose.onNodeWithTag("subtitle-language-picker").assertIsDisplayed()
++        screenshot("portrait-stable-off")
 +    }
 +
 +    @Test fun styleAndOffStayReachableWithThirtyNineTracks() {
@@ -203,17 +370,35 @@ index 0000000000000000000000000000000000000000..9128831929e7206ab6efdd8c4444b788
 +        path.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
 +    }
 +}
+diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt
+index a1735632911d8860a10929b1bc8de18dd710a761..abd6c364536b754fedff6cbf056a0a4747364cbe 100644
+--- a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt
++++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerSurfaceGesturesTest.kt
+@@ -68,6 +68,8 @@ class PlayerSurfaceGesturesTest {
+                         revealLockedOverlayState = noop,
+                     )
+                     .playerSurfaceDragGestures(
++                        playerController = null,
++                        swipeToSeekEnabledState = rememberUpdatedState(true),
+                         gestureController = gestureController,
+                         layoutSize = IntSize(320, 180),
+                         playbackGesturesEnabled = playbackReady.value,
 diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..aa6bf64d8ba4298a6f17fa53b27f1bf1edeae6f0
+index 0000000000000000000000000000000000000000..f517bf2705e43d7d37ec999d52db46cd436115d8
 --- /dev/null
 +++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,139 @@
 +package com.nuvio.app.features.player
 +
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
 +import android.view.View
 +import android.view.ViewGroup
 +import android.widget.FrameLayout
++import androidx.media3.common.text.Cue
++import androidx.media3.ui.AspectRatioFrameLayout
 +import androidx.media3.ui.PlayerView
 +import androidx.media3.ui.R
 +import androidx.test.core.app.ApplicationProvider
@@ -221,52 +406,141 @@ index 0000000000000000000000000000000000000000..aa6bf64d8ba4298a6f17fa53b27f1bf1
 +import org.junit.runner.RunWith
 +import org.robolectric.RobolectricTestRunner
 +import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
 +import kotlin.test.assertEquals
++import kotlin.test.assertTrue
 +
 +@RunWith(RobolectricTestRunner::class)
 +@Config(sdk = [34])
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
 +class PortraitSubtitleViewportTest {
-+    @Test fun captionsFollowVideoBoundsAndRestoreLandscapeWithoutRecreatingView() {
++    private fun player(nested: Boolean = false): PlayerView {
 +        val view = PlayerView(ApplicationProvider.getApplicationContext())
++        view.useController = false
++        view.setBackgroundColor(Color.BLACK)
++        view.findViewById<AspectRatioFrameLayout>(R.id.exo_content_frame).setAspectRatio(2.4f)
++        val captions = view.subtitleView!!
++        if (nested) {
++            (captions.parent as ViewGroup).removeView(captions)
++            view.findViewById<FrameLayout>(R.id.exo_content_frame).addView(captions)
++        }
 +        view.installPortraitSubtitleViewport()
++        captions.setApplyEmbeddedStyles(false)
++        captions.setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 24f)
++        return view
++    }
++
++    private fun layout(view: PlayerView, width: Int, height: Int) {
++        // Run complete measurement/layout/pre-draw traversals, not manual child.layout calls.
++        var stable = false
++        repeat(8) {
++            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
++                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
++            view.layout(0, 0, width, height)
++            stable = !view.viewTreeObserver.dispatchOnPreDraw()
++        }
++        assertTrue(stable, "Caption layout must converge without a redraw loop")
++    }
++
++    private fun text(view: PlayerView, explicitPosition: Boolean = false) {
++        val builder = Cue.Builder().setText("Readable portrait subtitle")
++        if (explicitPosition) builder.setLine(0.94f, Cue.LINE_TYPE_FRACTION).setLineAnchor(Cue.ANCHOR_TYPE_END)
++        view.subtitleView!!.setCues(listOf(builder.build()))
++    }
++
++    private fun assertDrawnInside(view: PlayerView, top: Int, bottom: Int, name: String) {
++        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
++        view.draw(Canvas(bitmap))
++        var pixels = 0
++        var first = view.height
++        var last = -1
++        for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
++            val c = bitmap.getPixel(x, y)
++            if (Color.green(c) > 180 && Color.alpha(c) > 200) {
++                pixels++; first = minOf(first, y); last = maxOf(last, y)
++            }
++        }
++        assertTrue(pixels > 30, "Actual subtitle pixels must be visible ($name)")
++        assertTrue(first >= top && last < bottom, "$name pixels $first..$last outside $top..$bottom")
++        val file = File("build/reports/ui-polish/$name.png"); file.parentFile.mkdirs()
++        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
++    }
++
++    @Test fun fittedTextActuallyDrawsInsideVideo() {
++        val view = player(); text(view); layout(view, 400, 900)
 +        val frame = view.findViewById<View>(R.id.exo_content_frame)
-+        view.layout(0, 0, 400, 900)
-+        frame.layout(0, 337, 400, 562)
-+        val portrait = view.subtitleView!!.layoutParams as FrameLayout.LayoutParams
-+        assertEquals(337, portrait.topMargin)
-+        assertEquals(225, portrait.height)
-+        view.layout(0, 0, 900, 400)
-+        frame.layout(94, 0, 805, 400)
-+        val landscape = view.subtitleView!!.layoutParams as FrameLayout.LayoutParams
-+        assertEquals(0, landscape.topMargin)
-+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, landscape.height)
++        assertDrawnInside(view, frame.top, frame.bottom, "caption-fit-text")
++    }
++
++    @Test fun nestedSubtitleViewDoesNotDoubleApplyVideoTopOffset() {
++        val view = player(nested = true); text(view); layout(view, 400, 900)
++        val frame = view.findViewById<View>(R.id.exo_content_frame)
++        assertTrue(view.subtitleView!!.parent === view)
++        assertEquals(frame.top, view.subtitleView!!.top)
++        assertDrawnInside(view, frame.top, frame.bottom, "caption-nested-fit")
++    }
++
++    @Test fun captionsFollowVideoBoundsAndRestoreLandscapeWithoutRecreatingView() {
++        val view = player(); text(view, true)
++        layout(view, 400, 900)
++        view.updatePortraitCaptionBottomInset(180)
++        view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
++        layout(view, 400, 900)
++        assertDrawnInside(view, 0, 720, "caption-zoom-controls")
++        layout(view, 900, 400)
++        assertEquals(0, view.subtitleView!!.top)
++        assertDrawnInside(view, 0, 400, "caption-landscape")
++        view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
++        layout(view, 400, 900)
++        val frame = view.findViewById<View>(R.id.exo_content_frame)
++        assertDrawnInside(view, frame.top, frame.bottom, "caption-return-fit")
++    }
++
++    @Test fun bitmapCuesRenderInsidePortraitVideo() {
++        val view = player()
++        val image = Bitmap.createBitmap(140, 25, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
++        view.subtitleView!!.setCues(listOf(Cue.Builder().setBitmap(image).setPosition(0.5f)
++            .setPositionAnchor(Cue.ANCHOR_TYPE_MIDDLE).setLine(0.95f, Cue.LINE_TYPE_FRACTION)
++            .setLineAnchor(Cue.ANCHOR_TYPE_END).setSize(0.7f).setBitmapHeight(0.15f).build()))
++        layout(view, 400, 900)
++        val frame = view.findViewById<View>(R.id.exo_content_frame)
++        assertDrawnInside(view, frame.top, frame.bottom, "caption-fit-bitmap")
++        view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
++        view.updatePortraitCaptionBottomInset(180)
++        layout(view, 400, 900)
++        assertDrawnInside(view, 0, 720, "caption-zoom-bitmap")
 +    }
 +
 +    @Test fun croppedAndUnknownVideoBoundsNeverCreateNegativeCaptionHeight() {
-+        val view = PlayerView(ApplicationProvider.getApplicationContext())
-+        val frame = view.findViewById<View>(R.id.exo_content_frame)
-+        view.layout(0, 0, 400, 900)
-+        frame.layout(0, -100, 400, 1000)
-+        view.alignPortraitSubtitleViewport()
-+        val params = view.subtitleView!!.layoutParams as FrameLayout.LayoutParams
-+        assertEquals(0, params.topMargin)
-+        assertEquals(900, params.height)
-+        frame.layout(0, 0, 0, 0)
-+        view.alignPortraitSubtitleViewport()
-+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, params.height)
++        val view = player(); text(view)
++        view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
++        view.updatePortraitCaptionBottomInset(400)
++        layout(view, 320, 480)
++        assertTrue(view.subtitleView!!.height > 0)
++        assertDrawnInside(view, 0, 240, "caption-short-fill")
++        view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
++        layout(view, 400, 900)
++        assertTrue(view.subtitleView!!.height > 0)
++        view.findViewById<AspectRatioFrameLayout>(R.id.exo_content_frame).setAspectRatio(0f)
++        layout(view, 400, 900)
++        assertTrue(view.subtitleView!!.height > 0)
++        assertDrawnInside(view, 0, 500, "caption-unknown-aspect")
 +    }
 +}
 diff --git a/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..a04e104deda5edc89a283b366e3a4341df952427
+index 0000000000000000000000000000000000000000..99c8527f8cd99bf5174903456b7901d1cdc0b07f
 --- /dev/null
 +++ b/composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,215 @@
 +package com.nuvio.app.features.search
 +
 +import android.graphics.Bitmap
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.lazy.rememberLazyListState
 +import androidx.compose.foundation.layout.fillMaxSize
 +import androidx.compose.foundation.layout.fillMaxWidth
 +import androidx.compose.foundation.layout.height
@@ -305,6 +579,8 @@ index 0000000000000000000000000000000000000000..a04e104deda5edc89a283b366e3a4341
 +    @get:Rule val compose = createComposeRule()
 +    private val history = mutableStateOf((1..10).map { "Query $it" })
 +    private var selected: String? = null
++    private val query = mutableStateOf("")
++    private val focused = mutableStateOf(false)
 +
 +    @Composable
 +    private fun Browse(fontScale: Float = 1f) {
@@ -313,8 +589,13 @@ index 0000000000000000000000000000000000000000..a04e104deda5edc89a283b366e3a4341
 +                LocalDensity provides Density(LocalDensity.current.density, fontScale),
 +                LocalNuvioBottomNavigationOverlayPadding provides 80.dp,
 +            ) {
++                val listState = rememberLazyListState()
++                Column(Modifier.fillMaxSize()) {
++                SearchContextHeader(listState, query.value, focused.value, history.value.isNotEmpty(),
++                    Modifier.testTag("search-context-title"))
 +                NuvioScreen(
-+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag("browse"),
++                    listState = listState,
++                    modifier = Modifier.weight(1f).background(MaterialTheme.colorScheme.background).testTag("browse"),
 +                    horizontalPadding = 0.dp,
 +                    topPadding = 0.dp,
 +                ) {
@@ -339,6 +620,42 @@ index 0000000000000000000000000000000000000000..a04e104deda5edc89a283b366e3a4341
 +                }
 +            }
 +        }
++    }
++
++    }
++
++    @Test fun headingFollowsDiscoverAndReturnsForFocusQueryAndScrollBack() {
++        compose.setContent { Browse() }
++        fun title(value: String) {
++            compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText(value)))
++        }
++        title("Search")
++        compose.onNodeWithTag("browse").performScrollToIndex(5)
++        title("Discover")
++        compose.runOnIdle { focused.value = true }
++        title("Search")
++        compose.runOnIdle { focused.value = false; query.value = "movie" }
++        title("Search")
++        compose.runOnIdle { query.value = "" }
++        title("Discover")
++        compose.onNodeWithTag("browse").performScrollToIndex(0)
++        title("Search")
++        screenshot("search-heading-restored")
++    }
++
++    @Test fun headingWorksWithoutHistoryAndWithExpandedHistory() {
++        history.value = emptyList()
++        compose.setContent { Browse() }
++        compose.onNodeWithTag("browse").performScrollToIndex(4)
++        compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText("Discover")))
++        compose.runOnIdle { history.value = (1..10).map { "Query $it" } }
++        compose.onNodeWithTag("browse").performScrollToIndex(0)
++        compose.onNodeWithText("Show all (10)").performClick()
++        compose.onNodeWithText("Query 9").performScrollTo()
++        compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText("Search")))
++        compose.onNodeWithTag("browse").performScrollToIndex(5)
++        compose.onNodeWithTag("search-context-title").assert(hasAnyDescendant(hasText("Discover")))
++        screenshot("discover-heading-restored")
 +    }
 +
 +    @Test fun historyStartsCompactAndFiltersAreAdjacentToResults() {
@@ -433,18 +750,42 @@ index 0000000000000000000000000000000000000000..a04e104deda5edc89a283b366e3a4341
 +    }
 +}
 diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt
-index f4e795032a1864dc211bb198c2af0bbb0af1cbf0..c82394bc6537d5d21b937c074abfeff3bc439ad8 100644
+index c9ad4d92307e9e7ec656e6328306e698c1c31f2a..ac0f5bcd7a79c0afb984684aca74531bbcad506f 100644
 --- a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt
 +++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerEngine.android.kt
-@@ -1179,6 +1179,7 @@ private fun ExoPlayerSurface(
+@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.toArgb
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.viewinterop.AndroidView
+ import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.platform.LocalDensity
+ import androidx.lifecycle.Lifecycle
+ import kotlinx.coroutines.runBlocking
+ import nuvio.composeapp.generated.resources.*
+@@ -243,6 +244,7 @@ private fun ExoPlayerSurface(
+     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
+     onError: (String?) -> Unit,
+ ) {
++    val captionBottomInsetPx = with(LocalDensity.current) { LocalPlayerCaptionBottomInset.current.roundToPx() }
+     val context = LocalContext.current
+     val lifecycleOwner = LocalLifecycleOwner.current
+     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
+@@ -1156,6 +1158,7 @@ private fun ExoPlayerSurface(
                  keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                  this.resizeMode = resizeMode.toExoResizeMode()
                  setShutterBackgroundColor(android.graphics.Color.BLACK)
-+                installPortraitSubtitleViewport()
++                installPortraitSubtitleViewport(captionBottomInsetPx)
                  playerViewRef = this
                  sidecarController.bindSubtitleView(this.subtitleView)
                  syncLibassOverlay(
-@@ -1480,11 +1481,13 @@ private fun LibmpvPlayerSurface(
+@@ -1170,6 +1173,7 @@ private fun ExoPlayerSurface(
+             playerView.player = exoPlayer
+             playerView.useController = useNativeController
+             playerView.resizeMode = resizeMode.toExoResizeMode()
++            playerView.updatePortraitCaptionBottomInset(captionBottomInsetPx)
+             playerViewRef = playerView
+             sidecarController.bindSubtitleView(playerView.subtitleView)
+             syncPlayerViewKeepScreenOn()
+@@ -1457,11 +1461,13 @@ private fun LibmpvPlayerSurface(
                      InAppLogger.error("MPV/Android", "Failed to initialize libmpv: ${error.localizedMessage ?: error::class.simpleName.orEmpty()}")
                      latestOnError.value(error.localizedMessage ?: "libmpv unavailable")
                  }
@@ -458,7 +799,7 @@ index f4e795032a1864dc211bb198c2af0bbb0af1cbf0..c82394bc6537d5d21b937c074abfeff3
              view.applyResizeMode(resizeMode)
          },
          onRelease = { view ->
-@@ -1838,6 +1841,20 @@ private class NuvioLibmpvView(
+@@ -1815,6 +1821,20 @@ private class NuvioLibmpvView(
          }
      }
  
@@ -479,8 +820,20 @@ index f4e795032a1864dc211bb198c2af0bbb0af1cbf0..c82394bc6537d5d21b937c074abfeff3
      fun applyResizeMode(resizeMode: PlayerResizeMode) {
          executeMpv {
              when (resizeMode) {
+@@ -2887,6 +2907,11 @@ private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
+ }
+ 
+ private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
++    // The portrait SubtitleView already occupies the visible video rectangle. Remapping PGS cues
++    // into a second fitted rectangle would apply letterboxing twice.
++    if (height > width && getTag(androidx.media3.ui.R.id.exo_subtitles) != null) {
++        return RectF(0f, 0f, 1f, 1f)
++    }
+     val subtitleView = this.subtitleView ?: return null
+     val viewWidth = subtitleView.width.toFloat()
+     val viewHeight = subtitleView.height.toFloat()
 diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt
-index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae8448e202615 100644
+index 0de45c91d28d17e51f8b7d8ba4e1345818f2100d..6d526e2658801c32584ef388759aa91c852fc9bf 100644
 --- a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt
 +++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.android.kt
 @@ -4,6 +4,7 @@ import android.app.Activity
@@ -501,13 +854,51 @@ index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae844
  import androidx.compose.runtime.getValue
  import androidx.compose.runtime.mutableStateOf
  import androidx.compose.runtime.remember
-@@ -26,20 +30,79 @@ import androidx.core.view.WindowInsetsControllerCompat
- import kotlin.math.roundToInt
- 
+@@ -32,7 +36,8 @@ import kotlin.math.roundToInt
  @Composable
--actual fun LockPlayerToLandscape() {
--    val activity = LocalContext.current.findActivity() ?: return
+ actual fun LockPlayerToLandscape() {
+     val activity = LocalContext.current.findActivity() ?: return
 -    if (!activity.shouldForceLandscapePlayer()) return
++    if (activity.resources.configuration.smallestScreenWidthDp >= 600 ||
++        activity.isInMultiWindowMode || activity.isInPictureInPictureMode) return
+ 
+     DisposableEffect(activity) {
+         val previousOrientation = activity.requestedOrientation
+@@ -44,6 +49,108 @@ actual fun LockPlayerToLandscape() {
+     }
+ }
+ 
++// Own restoration above the animated player destination, as upstream now requires.
++// The child still owns the rotate button/session policy; it must not restore during exit animation.
++internal object PlayerOrientationExitGuards {
++    private val originals = java.util.WeakHashMap<Activity, Int>()
++    fun original(activity: Activity): Int = originals[activity] ?: activity.requestedOrientation
++    fun begin(activity: Activity) { originals[activity] = activity.requestedOrientation }
++    fun restoreChild(activity: Activity, previous: Int) {
++        if (!originals.containsKey(activity)) activity.requestedOrientation = previous
++    }
++    fun finish(activity: Activity) {
++        originals.remove(activity)?.let { activity.requestedOrientation = it }
++    }
++}
++
++@Composable
++actual fun KeepPlayerOrientationUntilExit(settings: PlayerSettingsUiState) {
++    val activity = LocalContext.current.findActivity() ?: return
++    DisposableEffect(activity) {
++        PlayerOrientationExitGuards.begin(activity)
++        if (activity.resources.configuration.smallestScreenWidthDp < 600 &&
++            !activity.isInMultiWindowMode && !activity.isInPictureInPictureMode) {
++            activity.requestedOrientation = PlayerOrientationSession(
++                preference = settings.orientationPreference,
++                lastUsed = settings.lastPlayerOrientation,
++            ).requested.toAndroidRequestedOrientation()
++        }
++        onDispose { PlayerOrientationExitGuards.finish(activity) }
++    }
++}
++
++@Composable
 +actual fun rememberPlayerOrientationControl(
 +    sessionKey: String,
 +    settings: PlayerSettingsUiState,
@@ -525,23 +916,17 @@ index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae844
 +        lastUsed = settings.lastPlayerOrientation,
 +        sessionOverride = overrideName?.let(PlayerOrientation::fromStored),
 +    )
-+    val previousOrientation = remember(activity) { activity.requestedOrientation }
++    val previousOrientation = remember(activity) { PlayerOrientationExitGuards.original(activity) }
 +    val isTablet = configuration.smallestScreenWidthDp >= 600
- 
-     DisposableEffect(activity) {
--        val previousOrientation = activity.requestedOrientation
--        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
--
++
++    DisposableEffect(activity) {
 +        val listener = Consumer<MultiWindowModeChangedInfo> { info ->
 +            isInMultiWindow = info.isInMultiWindowMode
 +        }
 +        componentActivity?.addOnMultiWindowModeChangedListener(listener)
-         onDispose {
--            activity.requestedOrientation = previousOrientation
++        onDispose {
 +            componentActivity?.removeOnMultiWindowModeChangedListener(listener)
-+            if (activity.requestedOrientation != previousOrientation) {
-+                activity.requestedOrientation = previousOrientation
-+            }
++            PlayerOrientationExitGuards.restoreChild(activity, previousOrientation)
 +        }
 +    }
 +
@@ -575,10 +960,10 @@ index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae844
 +            ).rotate(displayed)
 +            overrideName = rotated.sessionOverride?.name
 +            rotated.orientationToRemember?.let(PlayerSettingsRepository::rememberPlayerOrientation)
-         }
-     }
- }
- 
++        }
++    }
++}
++
 +internal fun PlayerOrientation?.toAndroidRequestedOrientation(): Int = when (this) {
 +    PlayerOrientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 +    PlayerOrientation.Portrait -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -586,9 +971,9 @@ index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae844
 +}
 +
  @Composable
- actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
-     val activity = LocalContext.current.findActivity() ?: return
-@@ -131,12 +194,6 @@ private tailrec fun Context.findActivity(): Activity? =
+ actual fun FullscreenPlayerDialog(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+     Dialog(
+@@ -150,12 +257,6 @@ private tailrec fun Context.findActivity(): Activity? =
          else -> null
      }
  
@@ -602,12 +987,12 @@ index 0d7b3db7a273ac0cb27bae3ac5b1071fa5e7243b..d5f9220279e2c1f9c9706230700ae844
      private val activity: Activity,
      private val audioManager: AudioManager,
 diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt
-index 5cdf69755d03cdb98b4597ac1b7b68fe8a6d4e64..35761d9c790df4d7ebdb44f15043d4dfd5cc9bf1 100644
+index 37cb9f8212249f3fe78a50962d7a83ff32b45533..04efb0396911efeca186c3ac2f5e85d79cba4682 100644
 --- a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt
 +++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.android.kt
-@@ -21,6 +21,9 @@ actual object PlayerSettingsStorage {
-     private const val preferencesName = "nuvio_player_settings"
-     private const val showLoadingOverlayKey = "show_loading_overlay"
+@@ -23,6 +23,9 @@ actual object PlayerSettingsStorage {
+     private const val showPlayerLoadingStatusKey = "show_player_loading_status"
+     private const val pauseOverlayEnabledKey = "pause_overlay_enabled"
      private const val showParentalGuideKey = "show_parental_guide"
 +    // Phone orientation is local to this device and profile, not cloud-synced.
 +    private const val orientationPreferenceKey = "player_orientation_preference"
@@ -615,7 +1000,7 @@ index 5cdf69755d03cdb98b4597ac1b7b68fe8a6d4e64..35761d9c790df4d7ebdb44f15043d4df
      private const val resizeModeKey = "resize_mode"
      private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
      private const val holdToSpeedValueKey = "hold_to_speed_value"
-@@ -201,6 +204,26 @@ actual object PlayerSettingsStorage {
+@@ -232,6 +235,26 @@ actual object PlayerSettingsStorage {
              ?.apply()
      }
  
@@ -644,48 +1029,112 @@ index 5cdf69755d03cdb98b4597ac1b7b68fe8a6d4e64..35761d9c790df4d7ebdb44f15043d4df
  
 diff --git a/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewport.android.kt b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewport.android.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..26a51ef1f61714d4aa8a2a593bbda651a1f2cf49
+index 0000000000000000000000000000000000000000..76c6c8a4b32c81585a9f6d99453625cb1236b5d0
 --- /dev/null
 +++ b/composeApp/src/androidMain/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewport.android.kt
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,96 @@
 +package com.nuvio.app.features.player
 +
++import android.graphics.Rect
++import android.view.Gravity
 +import android.view.View
 +import android.view.ViewGroup
++import android.view.ViewTreeObserver
 +import android.widget.FrameLayout
 +import androidx.media3.ui.PlayerView
 +import androidx.media3.ui.R
 +
-+/** Follow the actual fitted/cropped picture, including rotation without Activity recreation. */
-+internal fun PlayerView.installPortraitSubtitleViewport() {
-+    val content = findViewById<View>(R.id.exo_content_frame) ?: return
-+    val listener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-+        alignPortraitSubtitleViewport()
-+    }
-+    content.addOnLayoutChangeListener(listener)
-+    addOnLayoutChangeListener(listener)
-+}
-+
-+internal fun PlayerView.alignPortraitSubtitleViewport() {
++/** Captions use one coordinate space even when a dependency places them inside the video frame. */
++internal fun PlayerView.installPortraitSubtitleViewport(bottomInsetPx: Int = 0) {
++    if (getTag(R.id.exo_subtitles) is PortraitCaptionViewport) return
 +    val captions = subtitleView ?: return
 +    val content = findViewById<View>(R.id.exo_content_frame) ?: return
-+    val params = captions.layoutParams as? FrameLayout.LayoutParams ?: return
-+    val portrait = height > width && width > 0 && content.height > 0
-+    val top = if (portrait) content.top.coerceIn(0, height) else 0
-+    val bottom = if (portrait) content.bottom.coerceIn(top, height) else height
-+    val targetHeight = if (portrait && bottom > top) bottom - top else ViewGroup.LayoutParams.MATCH_PARENT
-+    if (params.topMargin != top || params.height != targetHeight) {
-+        params.topMargin = top
++    // Never apply a PlayerView-relative top margin to a child of the already-offset video frame.
++    if (captions.parent !== this) {
++        (captions.parent as? ViewGroup)?.removeView(captions)
++        val overlayIndex = indexOfChild(findViewById(R.id.exo_ad_overlay)).takeIf { it >= 0 } ?: childCount
++        addView(captions, overlayIndex, FrameLayout.LayoutParams(-1, -1))
++    }
++    val viewport = PortraitCaptionViewport(this, content, captions, bottomInsetPx)
++    setTag(R.id.exo_subtitles, viewport)
++    viewport.install()
++}
++
++internal fun PlayerView.updatePortraitCaptionBottomInset(bottomInsetPx: Int) {
++    val viewport = getTag(R.id.exo_subtitles) as? PortraitCaptionViewport ?: return
++    if (viewport.bottomInsetPx != bottomInsetPx) {
++        viewport.bottomInsetPx = bottomInsetPx
++        requestLayout()
++    }
++}
++
++internal fun PlayerView.alignPortraitSubtitleViewport(): Boolean =
++    (getTag(R.id.exo_subtitles) as? PortraitCaptionViewport)?.align() ?: false
++
++private class PortraitCaptionViewport(
++    val player: PlayerView,
++    val content: View,
++    val captions: View,
++    var bottomInsetPx: Int,
++) : ViewTreeObserver.OnPreDrawListener, View.OnAttachStateChangeListener {
++    private val bounds = Rect()
++
++    fun install() {
++        player.addOnAttachStateChangeListener(this)
++        player.viewTreeObserver.addOnPreDrawListener(this)
++        player.requestLayout()
++    }
++
++    override fun onViewAttachedToWindow(v: View) {
++        v.viewTreeObserver.removeOnPreDrawListener(this)
++        v.viewTreeObserver.addOnPreDrawListener(this)
++    }
++
++    override fun onViewDetachedFromWindow(v: View) {
++        if (v.viewTreeObserver.isAlive) v.viewTreeObserver.removeOnPreDrawListener(this)
++    }
++
++    // A layout callback can run before its siblings are measured. Check after the whole traversal,
++    // and postpone drawing once when new geometry requires measurement. Never draw stale bounds.
++    override fun onPreDraw(): Boolean = !align()
++
++    fun align(): Boolean {
++        if (player.width <= 0 || player.height <= 0) return false
++        val portrait = player.height > player.width && content.width > 0 && content.height > 0
++        bounds.set(0, 0, player.width, player.height)
++        if (portrait) {
++            bounds.set(0, 0, content.width, content.height)
++            player.offsetDescendantRectToMyCoords(content, bounds)
++            if (!bounds.intersect(0, 0, player.width, player.height)) {
++                bounds.set(0, 0, player.width, player.height)
++            }
++            // Keep room for measured controls in Zoom/Fill. Preserve a usable viewport on short screens.
++            val safeBottom = player.height - bottomInsetPx.coerceIn(0, player.height / 2)
++            bounds.bottom = minOf(bounds.bottom, maxOf(bounds.top + 1, safeBottom))
++        }
++        val params = captions.layoutParams as FrameLayout.LayoutParams
++        val targetWidth = if (portrait) bounds.width() else ViewGroup.LayoutParams.MATCH_PARENT
++        val targetHeight = if (portrait) bounds.height() else ViewGroup.LayoutParams.MATCH_PARENT
++        if (params.leftMargin == bounds.left && params.topMargin == bounds.top &&
++            params.width == targetWidth && params.height == targetHeight &&
++            params.gravity == (Gravity.TOP or Gravity.START)) return false
++        params.gravity = Gravity.TOP or Gravity.START
++        params.leftMargin = bounds.left
++        params.topMargin = bounds.top
++        params.rightMargin = 0
++        params.bottomMargin = 0
++        params.width = targetWidth
 +        params.height = targetHeight
 +        captions.layoutParams = params
++        return true
 +    }
 +}
 diff --git a/composeApp/src/commonMain/composeResources/values/player_orientation.xml b/composeApp/src/commonMain/composeResources/values/player_orientation.xml
 new file mode 100644
-index 0000000000000000000000000000000000000000..92ba72e9d53a36c1fe9df46c1a145f1f0882687c
+index 0000000000000000000000000000000000000000..63ed2080ac1644c08e715ae5eec2d9279e4cde9d
 --- /dev/null
 +++ b/composeApp/src/commonMain/composeResources/values/player_orientation.xml
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +<resources>
 +    <string name="compose_player_rotate_screen">Rotate screen</string>
 +    <string name="settings_player_orientation">Player orientation</string>
@@ -697,6 +1146,7 @@ index 0000000000000000000000000000000000000000..92ba72e9d53a36c1fe9df46c1a145f1f
 +    <string name="settings_player_orientation_landscape_description">Start each video in Landscape. The rotate button changes only the current video.</string>
 +    <string name="settings_player_orientation_portrait_description">Start each video in Portrait. The rotate button changes only the current video.</string>
 +    <string name="settings_player_orientation_device_description">Follow system auto-rotate. The rotate button overrides it for the current video.</string>
++    <string name="orientation_updates_stable_description">Verified stable Orientation releases. Upstream beta builds are not offered by this app.</string>
 +</resources>
 diff --git a/composeApp/src/commonMain/composeResources/values/search_polish.xml b/composeApp/src/commonMain/composeResources/values/search_polish.xml
 new file mode 100644
@@ -709,10 +1159,10 @@ index 0000000000000000000000000000000000000000..679e3b6f9767335638f65f4e8850b575
 +    <string name="search_history_show_less">Show less</string>
 +</resources>
 diff --git a/composeApp/src/commonMain/composeResources/values/strings.xml b/composeApp/src/commonMain/composeResources/values/strings.xml
-index 885080b99692538c510c2437f3bb9c3ce4c33d86..78934421a86c5c19f239d66183d21d85014414cf 100644
+index dc94a792e1d974483a0d362000ea9fca3a9c8138..134804b72cdc5ef6c4d6e508839d78270a2ad389 100644
 --- a/composeApp/src/commonMain/composeResources/values/strings.xml
 +++ b/composeApp/src/commonMain/composeResources/values/strings.xml
-@@ -754,14 +754,14 @@
+@@ -768,14 +768,14 @@
      <string name="settings_homescreen_section_catalogs_collections">CATALOGS &amp; COLLECTIONS</string>
      <string name="settings_homescreen_section_collections">COLLECTIONS</string>
      <string name="settings_homescreen_section_hero">HOME LAYOUT</string>
@@ -730,7 +1180,7 @@ index 885080b99692538c510c2437f3bb9c3ce4c33d86..78934421a86c5c19f239d66183d21d85
      <string name="settings_homescreen_selected_count">%1$d of %2$d selected</string>
      <string name="settings_homescreen_show_hero">Show Hero Section</string>
      <string name="settings_homescreen_show_hero_description">Display hero carousel at top of home.</string>
-@@ -1381,7 +1381,7 @@
+@@ -1403,7 +1403,7 @@
      <string name="settings_trakt_features">FEATURES</string>
      <string name="settings_trakt_finish_sign_in">Finish connection approval</string>
      <string name="settings_trakt_intro_description">Sync your watchlist, watch progress, continue watching, scrobbles, and personal lists with Trakt.</string>
@@ -739,7 +1189,7 @@ index 885080b99692538c510c2437f3bb9c3ce4c33d86..78934421a86c5c19f239d66183d21d85
      <string name="settings_trakt_open_login">Open Trakt Login</string>
      <string name="settings_trakt_open_activate">Open Trakt Activate</string>
      <string name="settings_trakt_save_actions_description">Sync your watchlist, watch progress, continue watching, scrobbles, and personal lists with Trakt.</string>
-@@ -1426,7 +1426,7 @@
+@@ -1450,7 +1450,7 @@
      <string name="settings_simkl_finish_sign_in">Finish connection approval</string>
      <string name="settings_simkl_open_login">Open Simkl Login</string>
      <string name="settings_simkl_sign_in_description">Connect Simkl to sync lists, watched history, playback progress, and scrobbles.</string>
@@ -748,6 +1198,28 @@ index 885080b99692538c510c2437f3bb9c3ce4c33d86..78934421a86c5c19f239d66183d21d85
      <string name="settings_simkl_visit">Visit Simkl</string>
      <string name="settings_simkl_invalid_callback">Simkl did not accept the sign-in callback. Please try again.</string>
      <string name="settings_simkl_authorization_expired">Simkl code expired. Start again.</string>
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/MainAppContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/MainAppContent.kt
+index 270f7096f18e5a7d55b2309f231acc7874127c4f..ecb0c3dbf6019ceb7bf6000db6c6e68a1e18cda6 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/MainAppContent.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/MainAppContent.kt
+@@ -135,7 +135,7 @@ import com.nuvio.app.features.player.PlayerPlaybackSnapshot
+ import com.nuvio.app.features.player.PlayerSettingsRepository
+ import com.nuvio.app.features.player.SubtitleLanguageOption
+ import com.nuvio.app.features.player.prepareExternalPlayerLaunch
+-import com.nuvio.app.features.player.LockPlayerToLandscape
++import com.nuvio.app.features.player.KeepPlayerOrientationUntilExit
+ import com.nuvio.app.features.player.HidePlayerSystemBars
+ import com.nuvio.app.features.player.rememberExternalPlayerLauncher
+ import com.nuvio.app.features.profiles.ProfileEditScreen
+@@ -323,7 +323,7 @@ internal fun MainAppContent(
+     var visiblePlayerEntries by remember { mutableIntStateOf(0) }
+     var streamLandscapeLoadingVisible by remember(currentRoute) { mutableStateOf(false) }
+     if (currentRoute is PlayerRoute || visiblePlayerEntries > 0 || streamLandscapeLoadingVisible) {
+-        LockPlayerToLandscape()
++        KeepPlayerOrientationUntilExit(playerSettingsUiState)
+         HidePlayerSystemBars()
+     }
+     val p2pSettingsUiState by remember {
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt
 index c9b0f46ace1f0dbc816797e2b0296d07118792c4..211940e86a89b4742d52aba95e7c43d7c33f7ce3 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt
@@ -884,10 +1356,10 @@ index c9b0f46ace1f0dbc816797e2b0296d07118792c4..211940e86a89b4742d52aba95e7c43d7
                  Text(
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..7075c0c0eceeaa404e65d07419e1c469bb898ee1
+index 0000000000000000000000000000000000000000..a476613a58829cf7e4e3e6324250a9fe20d765e7
 --- /dev/null
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,98 @@
 +package com.nuvio.app.features.player
 +
 +import androidx.compose.foundation.gestures.detectTapGestures
@@ -899,6 +1371,7 @@ index 0000000000000000000000000000000000000000..7075c0c0eceeaa404e65d07419e1c469
 +import androidx.compose.foundation.layout.WindowInsets
 +import androidx.compose.foundation.layout.fillMaxSize
 +import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
 +import androidx.compose.foundation.layout.heightIn
 +import androidx.compose.foundation.layout.padding
 +import androidx.compose.foundation.layout.safeContent
@@ -930,6 +1403,7 @@ index 0000000000000000000000000000000000000000..7075c0c0eceeaa404e65d07419e1c469
 +internal fun CompactPlayerTrackSheet(
 +    title: String,
 +    onDismiss: () -> Unit,
++    fillAvailableHeight: Boolean = false,
 +    content: @Composable ColumnScope.() -> Unit,
 +) {
 +    BoxWithConstraints(
@@ -939,7 +1413,8 @@ index 0000000000000000000000000000000000000000..7075c0c0eceeaa404e65d07419e1c469
 +            modifier = Modifier
 +                .align(Alignment.Center)
 +                .width((maxWidth * 0.92f).coerceAtMost(560.dp))
-+                .heightIn(max = (maxHeight * 0.90f).coerceAtMost(840.dp))
++                .then(if (fillAvailableHeight) Modifier.height((maxHeight * 0.90f).coerceAtMost(840.dp))
++                    else Modifier.heightIn(max = (maxHeight * 0.90f).coerceAtMost(840.dp)))
 +                .pointerInput(Unit) { detectTapGestures(onTap = {}) },
 +            shape = RoundedCornerShape(24.dp),
 +            color = MaterialTheme.nuvio.colors.surface.copy(alpha = 1f),
@@ -983,8 +1458,21 @@ index 0000000000000000000000000000000000000000..7075c0c0eceeaa404e65d07419e1c469
 +        )
 +    }
 +}
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerCaptionInsets.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerCaptionInsets.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..49612fb6732934d095ebe067fdee162df26086b3
+--- /dev/null
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerCaptionInsets.kt
+@@ -0,0 +1,7 @@
++package com.nuvio.app.features.player
++
++import androidx.compose.runtime.compositionLocalOf
++import androidx.compose.ui.unit.dp
++
++/** Retain measured portrait controls clearance while controls fade, avoiding caption jumps. */
++internal val LocalPlayerCaptionBottomInset = compositionLocalOf { 0.dp }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt
-index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f99a37974c 100644
+index 4c16bdf93044cc474f419e2caedeff232ed32cfe..8b45bcdfab25c383d4a460a1b48b746eda7d9aad 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt
 @@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
@@ -1012,7 +1500,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.graphics.graphicsLayer
-@@ -95,6 +99,7 @@ internal fun PlayerControlsShell(
+@@ -97,6 +101,7 @@ internal fun PlayerControlsShell(
      onSeekBack: () -> Unit,
      onSeekForward: () -> Unit,
      onResizeModeClick: () -> Unit,
@@ -1020,15 +1508,16 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
      onSpeedClick: (() -> Unit)? = null,
      onSubtitleClick: (() -> Unit)? = null,
      onAudioClick: (() -> Unit)? = null,
-@@ -114,6 +119,7 @@ internal fun PlayerControlsShell(
+@@ -116,6 +121,8 @@ internal fun PlayerControlsShell(
      onScrubChange: (Long) -> Unit,
      onScrubFinished: (Long) -> Unit,
      horizontalSafePadding: androidx.compose.ui.unit.Dp,
 +    onHeaderHeightChanged: (Int) -> Unit = {},
++    onFooterHeightChanged: (Int) -> Unit = {},
      modifier: Modifier = Modifier,
  ) {
      Box(modifier = modifier.fillMaxSize()) {
-@@ -170,11 +176,13 @@ internal fun PlayerControlsShell(
+@@ -172,11 +179,13 @@ internal fun PlayerControlsShell(
                  onVideoSettingsClick = onVideoSettingsClick,
                  onPictureInPictureClick = onPictureInPictureClick,
                  onInfoClick = onInfoClick,
@@ -1042,15 +1531,18 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                      .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Top))
                      .padding(
                          start = metrics.horizontalPadding,
-@@ -217,6 +225,7 @@ internal fun PlayerControlsShell(
+@@ -217,8 +226,10 @@ internal fun PlayerControlsShell(
+                     onQualityClick = onQualityClick,
+                     modifier = Modifier
                          .align(Alignment.BottomCenter)
++                        .onSizeChanged { onFooterHeightChanged(it.height) }
                          .fillMaxWidth()
                          .padding(horizontal = metrics.horizontalPadding)
 +                        .windowInsetsPadding(WindowInsets.safeContent.only(WindowInsetsSides.Bottom))
                          .padding(bottom = metrics.sliderBottomOffset),
                  )
              }
-@@ -224,6 +233,7 @@ internal fun PlayerControlsShell(
+@@ -226,6 +237,7 @@ internal fun PlayerControlsShell(
      }
  }
  
@@ -1058,7 +1550,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
  @Composable
  private fun PlayerHeader(
      title: String,
-@@ -243,6 +253,7 @@ private fun PlayerHeader(
+@@ -245,6 +257,7 @@ private fun PlayerHeader(
      onVideoSettingsClick: (() -> Unit)?,
      onPictureInPictureClick: (() -> Unit)?,
      onInfoClick: (() -> Unit)?,
@@ -1066,7 +1558,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
      onOpenInExternalPlayer: (() -> Unit)?,
      onBack: () -> Unit,
      modifier: Modifier = Modifier,
-@@ -254,13 +265,14 @@ private fun PlayerHeader(
+@@ -256,13 +269,14 @@ private fun PlayerHeader(
          label = "playerHeaderMetadataAlpha",
      )
      Column(modifier = modifier) {
@@ -1084,7 +1576,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
              ) {
                  Column(
                      modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
-@@ -330,15 +342,19 @@ private fun PlayerHeader(
+@@ -332,15 +346,19 @@ private fun PlayerHeader(
              }
  
              if (showActions) {
@@ -1108,7 +1600,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                              iconSize = metrics.headerIconSize,
                              onClick = onSubmitIntroClick,
                          )
-@@ -347,7 +363,7 @@ private fun PlayerHeader(
+@@ -349,7 +367,7 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.AutoMirrored.Rounded.OpenInNew,
                              contentDescription = stringResource(Res.string.streams_open_external_player),
@@ -1117,7 +1609,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                              iconSize = metrics.headerIconSize,
                              onClick = onOpenInExternalPlayer,
                          )
-@@ -359,7 +375,7 @@ private fun PlayerHeader(
+@@ -361,7 +379,7 @@ private fun PlayerHeader(
                          } else {
                              stringResource(Res.string.compose_player_lock_controls)
                          },
@@ -1126,7 +1618,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                          iconSize = metrics.headerIconSize,
                          onClick = onLockToggle,
                      )
-@@ -367,7 +383,7 @@ private fun PlayerHeader(
+@@ -369,7 +387,7 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.Rounded.Build,
                              contentDescription = stringResource(Res.string.player_action_video_settings),
@@ -1135,7 +1627,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                              iconSize = metrics.headerIconSize,
                              onClick = onVideoSettingsClick,
                          )
-@@ -376,7 +392,7 @@ private fun PlayerHeader(
+@@ -378,7 +396,7 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.Rounded.PictureInPictureAlt,
                              contentDescription = "Picture in Picture",
@@ -1144,7 +1636,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                              iconSize = metrics.headerIconSize,
                              onClick = onPictureInPictureClick,
                          )
-@@ -385,16 +401,25 @@ private fun PlayerHeader(
+@@ -387,16 +405,25 @@ private fun PlayerHeader(
                          PlayerHeaderIconButton(
                              icon = Icons.Rounded.Info,
                              contentDescription = stringResource(Res.string.compose_player_playback_info),
@@ -1172,7 +1664,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
                          iconSize = metrics.headerIconSize,
                          contentDescription = stringResource(Res.string.compose_player_close),
                      )
-@@ -526,6 +551,7 @@ private fun PlayPauseControlButton(
+@@ -528,6 +555,7 @@ internal fun PlayPauseControlButton(
      }
  }
  
@@ -1180,7 +1672,7 @@ index ad8ae87d86c131400e84622b38cdb4743d7c9533..3386e202136f67fcce45a68f86c238f9
  @Composable
  private fun ProgressControls(
      playbackSnapshot: PlayerPlaybackSnapshot,
-@@ -599,10 +625,10 @@ private fun ProgressControls(
+@@ -572,10 +600,10 @@ private fun ProgressControls(
                      shape = RoundedCornerShape(24.dp),
                  ),
              ) {
@@ -1309,23 +1801,27 @@ index 211630b4ba48356db44421869d1dee71cd062a68..70daf3efa95021c57e2ad58c95582023
              )
          }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt
-index 1b8754ce96187d0317d37fa0857921ee2362cc45..5d0682a49df09cc0c21349c8eb069a1a60eb2021 100644
+index 594c98e41ea5cdffca1ded2d751c2f072dbd91a4..caf42c24f72d580b3ddf15dce01206f3d3eee2cf 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.kt
-@@ -16,7 +16,10 @@ data class PlayerAudioLevel(
- )
- 
+@@ -18,6 +18,15 @@ data class PlayerAudioLevel(
  @Composable
--expect fun LockPlayerToLandscape()
+ expect fun LockPlayerToLandscape()
+ 
++@Composable
++expect fun KeepPlayerOrientationUntilExit(settings: PlayerSettingsUiState)
++
++@Composable
 +expect fun rememberPlayerOrientationControl(
 +    sessionKey: String,
 +    settings: PlayerSettingsUiState,
 +): (() -> Unit)?
- 
++
  @Composable
- expect fun EnterImmersivePlayerMode(keepScreenAwake: Boolean)
+ expect fun FullscreenPlayerDialog(
+     onDismiss: () -> Unit,
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt
-index 3885453c4e4445673bb38d0b6569382ad7f91e97..b8efcca8d4c419db0514b50bd987f4103544ec2c 100644
+index 688378b7cc82ae74872e8cde7b244e4f3a8ceaa7..5db48f3fa3ecf024ac219bf39b689fabafa946bb 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerPlaybackOverlays.kt
 @@ -43,6 +43,7 @@ internal fun BoxScope.PlayerPlaybackOverlays(
@@ -1399,19 +1895,10 @@ index 3885453c4e4445673bb38d0b6569382ad7f91e97..b8efcca8d4c419db0514b50bd987f410
 +
 +}
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt
-index c5e72a9989eb45f6218cf4e1252ad365f7c52076..60bee1481b24b3e70d57f76115d57cd6ea321800 100644
+index e260af01f483f0c5ca7dee3f51f68528ad1e6b23..a945715d9059c7cc05bac4f802ec4688dab7c4e1 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenContent.kt
-@@ -41,8 +41,6 @@ import org.jetbrains.compose.resources.stringResource
- 
- @Composable
- internal fun PlayerScreenContent(args: PlayerScreenArgs) {
--    LockPlayerToLandscape()
--
-     val playerSettingsUiState by remember {
-         PlayerSettingsRepository.ensureLoaded()
-         PlayerSettingsRepository.uiState
-@@ -138,6 +136,14 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
+@@ -136,6 +136,14 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
              runtime.lastSyncedSettingsResizeMode = playerSettingsUiState.resizeMode
          }
          runtime.resetIdentityStateIfNeeded()
@@ -1426,7 +1913,7 @@ index c5e72a9989eb45f6218cf4e1252ad365f7c52076..60bee1481b24b3e70d57f76115d57cd6
  
          val keepScreenAwake = runtime.errorMessage == null &&
              (runtime.playbackSnapshot.isPlaying ||
-@@ -151,6 +157,6 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
+@@ -149,6 +157,6 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
              ),
          )
          runtime.BindPlayerRuntimeEffects()
@@ -1435,10 +1922,14 @@ index c5e72a9989eb45f6218cf4e1252ad365f7c52076..60bee1481b24b3e70d57f76115d57cd6
      }
  }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt
-index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed94cb44b15 100644
+index c87a62b2e2bf3ade2e0084930aaf073a53e56ed8..e9833e2f7a26e36ec787b4ce3d5a685336040489 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerScreenRuntimeUi.kt
-@@ -11,6 +11,12 @@ import androidx.compose.runtime.Composable
+@@ -8,9 +8,16 @@ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.BoxScope
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
  import androidx.compose.runtime.LaunchedEffect
  import androidx.compose.runtime.derivedStateOf
  import androidx.compose.runtime.remember
@@ -1451,7 +1942,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
  import androidx.compose.runtime.rememberUpdatedState
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.focus.FocusRequester
-@@ -24,8 +30,9 @@ import kotlinx.coroutines.launch
+@@ -24,8 +31,10 @@ import kotlinx.coroutines.launch
  import nuvio.composeapp.generated.resources.*
  
  @Composable
@@ -1459,15 +1950,110 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
 +internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(onRotateScreen: (() -> Unit)? = null) {
      val runtime = this
 +    var controlsHeaderHeight by remember { mutableStateOf(0.dp) }
++    var controlsFooterHeight by remember(layoutSize) { mutableStateOf(0.dp) }
      val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
      val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
      val currentGestureFeedback = liveGestureFeedback ?: gestureFeedback
-@@ -293,11 +300,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
+@@ -232,48 +241,51 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
+         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
+         val initialPositionRequestKey = currentInitialPositionRequestKey()
+         if (playerSurfaceSourceUrl != null) {
+-            PlatformPlayerSurface(
+-                sourceUrl = playerSurfaceSourceUrl,
+-                sourceAudioUrl = activeSourceAudioUrl,
+-                sourceHeaders = activeSourceHeaders,
+-                sourceResponseHeaders = activeSourceResponseHeaders,
+-                externalSubtitles = externalSubtitles,
+-                streamType = activeStreamType,
+-                modifier = Modifier.fillMaxSize(),
+-                playWhenReady = shouldPlay,
+-                initialPositionMs = activeInitialPositionMs.takeIf { it > 0L },
+-                initialPositionRequestKey = initialPositionRequestKey,
+-                resizeMode = resizeMode,
+-                onInitialPositionHandled = { key, handled ->
+-                    if (key == currentInitialPositionRequestKey()) {
+-                        initialSeekApplied = handled
+-                    }
+-                },
+-                onControllerReady = { controller ->
+-                    playerController = controller
+-                    playerControllerSourceUrl = playerSurfaceSourceUrl
+-                },
+-                onSnapshot = { snapshot ->
+-                    playbackSnapshot = snapshot
+-                    checkAutoSubtitleRewindWatermark(snapshot.positionMs)
+-                    refreshAudioTracksIfChanged()
+-                    if (!snapshot.isLoading) initialLoadCompleted = true
+-                    if (snapshot.isEnded) {
+-                        shouldPlay = false
+-                        controlsVisible = !playerControlsLocked
+-                    }
+-                },
+-                onError = { message ->
+-                    if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
+-                        return@PlatformPlayerSurface
+-                    }
+-                    errorMessage = message
+-                    if (message != null) {
+-                        controlsVisible = !playerControlsLocked
+-                        removeFailedStreamFromCache()
+-                    }
+-                },
+-            )
++            CompositionLocalProvider(LocalPlayerCaptionBottomInset provides
++                if (metrics.compactControls) controlsFooterHeight + 8.dp else 0.dp) {
++                PlatformPlayerSurface(
++                    sourceUrl = playerSurfaceSourceUrl,
++                    sourceAudioUrl = activeSourceAudioUrl,
++                    sourceHeaders = activeSourceHeaders,
++                    sourceResponseHeaders = activeSourceResponseHeaders,
++                    externalSubtitles = externalSubtitles,
++                    streamType = activeStreamType,
++                    modifier = Modifier.fillMaxSize(),
++                    playWhenReady = shouldPlay,
++                    initialPositionMs = activeInitialPositionMs.takeIf { it > 0L },
++                    initialPositionRequestKey = initialPositionRequestKey,
++                    resizeMode = resizeMode,
++                    onInitialPositionHandled = { key, handled ->
++                        if (key == currentInitialPositionRequestKey()) {
++                            initialSeekApplied = handled
++                        }
++                    },
++                    onControllerReady = { controller ->
++                        playerController = controller
++                        playerControllerSourceUrl = playerSurfaceSourceUrl
++                    },
++                    onSnapshot = { snapshot ->
++                        playbackSnapshot = snapshot
++                        checkAutoSubtitleRewindWatermark(snapshot.positionMs)
++                        refreshAudioTracksIfChanged()
++                        if (!snapshot.isLoading) initialLoadCompleted = true
++                        if (snapshot.isEnded) {
++                            shouldPlay = false
++                            controlsVisible = !playerControlsLocked
++                        }
++                    },
++                    onError = { message ->
++                        if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
++                            return@PlatformPlayerSurface
++                        }
++                        errorMessage = message
++                        if (message != null) {
++                            controlsVisible = !playerControlsLocked
++                            removeFailedStreamFromCache()
++                        }
++                    },
++                )
++            }
+         }
+ 
+         AnimatedVisibility(
+@@ -296,11 +308,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
              )
          }
  
 -        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode)
-+        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it })
++        RenderPlayerControls(displayedPositionMs = displayedPositionMs, isEpisode = isEpisode, onRotateScreen = onRotateScreen, onHeaderHeightChanged = { controlsHeaderHeight = it }, onFooterHeightChanged = { controlsFooterHeight = it })
          RenderPlaybackOverlays(
              runtime = runtime,
              displayedPositionMs = displayedPositionMs,
@@ -1476,7 +2062,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
              p2pInitialLoadingMessage = p2pInitialLoadingMessage,
              p2pInitialLoadingProgress = p2pInitialLoadingProgress,
              showP2pRebufferStats = showP2pRebufferStats,
-@@ -327,10 +335,17 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
+@@ -330,10 +343,18 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
  }
  
  @Composable
@@ -1486,6 +2072,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
 +    isEpisode: Boolean,
 +    onRotateScreen: (() -> Unit)?,
 +    onHeaderHeightChanged: (Dp) -> Unit,
++    onFooterHeightChanged: (Dp) -> Unit,
 +) {
 +    val density = LocalDensity.current
      val isInPip = rememberIsInPictureInPicture()
@@ -1496,7 +2083,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
          enter = fadeIn(),
          exit = fadeOut(),
      ) {
-@@ -359,6 +374,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
+@@ -362,6 +383,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
              onSeekBack = { seekBy(-10_000L) },
              onSeekForward = { seekBy(10_000L) },
              onResizeModeClick = { cycleResizeMode() },
@@ -1509,15 +2096,16 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
              onSpeedClick = if (!isLiveTvPlayback) {
                  {
                      cyclePlaybackSpeed()
-@@ -479,6 +500,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
+@@ -482,6 +509,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long,
                  scheduleProgressSyncAfterSeek()
              },
              horizontalSafePadding = horizontalSafePadding,
 +            onHeaderHeightChanged = { height -> onHeaderHeightChanged(with(density) { height.toDp() }) },
++            onFooterHeightChanged = { height -> onFooterHeightChanged(with(density) { height.toDp() }) },
              modifier = Modifier.fillMaxSize(),
          )
      }
-@@ -489,6 +511,7 @@ private fun BoxScope.RenderPlaybackOverlays(
+@@ -492,6 +521,7 @@ private fun BoxScope.RenderPlaybackOverlays(
      runtime: PlayerScreenRuntime,
      displayedPositionMs: Long,
      currentGestureFeedback: GestureFeedbackState?,
@@ -1525,7 +2113,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
      p2pInitialLoadingMessage: String?,
      p2pInitialLoadingProgress: Float?,
      showP2pRebufferStats: Boolean,
-@@ -517,7 +540,8 @@ private fun BoxScope.RenderPlaybackOverlays(
+@@ -526,7 +556,8 @@ private fun BoxScope.RenderPlaybackOverlays(
          showP2pRebufferStats = showP2pRebufferStats,
          p2pRebufferMessage = p2pRebufferMessage,
          p2pRebufferProgress = p2pRebufferProgress,
@@ -1535,7 +2123,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
          renderedGestureFeedback = renderedGestureFeedback,
          initialLoadCompleted = initialLoadCompleted,
          pausedOverlayVisible = pausedOverlayVisible,
-@@ -638,9 +662,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+@@ -647,9 +678,13 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
              scope.launch {
                  kotlinx.coroutines.delay(200)
                  showAudioModal = false
@@ -1550,7 +2138,7 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
          showSubtitleModal = showSubtitleModal,
          subtitleTracks = subtitleTracks,
          selectedSubtitleIndex = selectedSubtitleIndex,
-@@ -683,7 +711,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+@@ -692,7 +727,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
          onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
          onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
          onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
@@ -1563,46 +2151,46 @@ index 84319c1906f867a1045f7a4edd6aa03ed586cce7..22bc572cf1b49fe0d6584a7220f38ed9
          playerSettings = playerSettingsUiState,
          onVideoSettingsChanged = {
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt
-index 66c26c8bae8e007aeacfbd1dee6b7a17ecda7836..23389fb8f52b3f09fa51bc844a46a5e748cd343f 100644
+index 678cdbd97753701f1daee25e70503318fb0b4ef1..d56f7f403845cdfb2ffecc56469edb1afe83231e 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsRepository.kt
-@@ -34,6 +34,8 @@ fun snapToAllowedTimeout(value: Int): Int {
- data class PlayerSettingsUiState(
-     val showLoadingOverlay: Boolean = true,
+@@ -36,6 +36,8 @@ data class PlayerSettingsUiState(
+     val showPlayerLoadingStatus: Boolean = true,
+     val pauseOverlayEnabled: Boolean = true,
      val showParentalGuide: Boolean = true,
 +    val orientationPreference: PlayerOrientationPreference = PlayerOrientationPreference.RememberLastUsed,
 +    val lastPlayerOrientation: PlayerOrientation = PlayerOrientation.Landscape,
      val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
      val holdToSpeedEnabled: Boolean = true,
      val holdToSpeedValue: Float = 2f,
-@@ -104,6 +106,8 @@ object PlayerSettingsRepository {
-     private var hasLoaded = false
-     private var showLoadingOverlay = true
+@@ -108,6 +110,8 @@ object PlayerSettingsRepository {
+     private var showPlayerLoadingStatus = true
+     private var pauseOverlayEnabled = true
      private var showParentalGuide = true
 +    private var orientationPreference = PlayerOrientationPreference.RememberLastUsed
 +    private var lastPlayerOrientation = PlayerOrientation.Landscape
      private var resizeMode = PlayerResizeMode.Fit
      private var holdToSpeedEnabled = true
      private var holdToSpeedValue = 2f
-@@ -179,6 +183,8 @@ object PlayerSettingsRepository {
-         hasLoaded = false
-         showLoadingOverlay = true
+@@ -185,6 +189,8 @@ object PlayerSettingsRepository {
+         showPlayerLoadingStatus = true
+         pauseOverlayEnabled = true
          showParentalGuide = true
 +        orientationPreference = PlayerOrientationPreference.RememberLastUsed
 +        lastPlayerOrientation = PlayerOrientation.Landscape
          resizeMode = PlayerResizeMode.Fit
          holdToSpeedEnabled = true
          holdToSpeedValue = 2f
-@@ -246,6 +252,8 @@ object PlayerSettingsRepository {
-         hasLoaded = true
-         showLoadingOverlay = PlayerSettingsStorage.loadShowLoadingOverlay() ?: true
+@@ -254,6 +260,8 @@ object PlayerSettingsRepository {
+         showPlayerLoadingStatus = PlayerSettingsStorage.loadShowPlayerLoadingStatus() ?: true
+         pauseOverlayEnabled = PlayerSettingsStorage.loadPauseOverlayEnabled() ?: true
          showParentalGuide = PlayerSettingsStorage.loadShowParentalGuide() ?: true
 +        orientationPreference = PlayerOrientationPreference.fromStored(PlayerSettingsStorage.loadOrientationPreference())
 +        lastPlayerOrientation = PlayerOrientation.fromStored(PlayerSettingsStorage.loadLastPlayerOrientation())
          resizeMode = PlayerSettingsStorage.loadResizeMode()
              ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
              ?: PlayerResizeMode.Fit
-@@ -396,6 +404,24 @@ object PlayerSettingsRepository {
+@@ -420,6 +428,24 @@ object PlayerSettingsRepository {
          PlayerSettingsStorage.saveShowParentalGuide(enabled)
      }
  
@@ -1627,9 +2215,9 @@ index 66c26c8bae8e007aeacfbd1dee6b7a17ecda7836..23389fb8f52b3f09fa51bc844a46a5e7
      fun setResizeMode(mode: PlayerResizeMode) {
          ensureLoaded()
          if (resizeMode == mode) return
-@@ -959,6 +985,8 @@ object PlayerSettingsRepository {
-         _uiState.value = PlayerSettingsUiState(
-             showLoadingOverlay = showLoadingOverlay,
+@@ -985,6 +1011,8 @@ object PlayerSettingsRepository {
+             showPlayerLoadingStatus = showPlayerLoadingStatus,
+             pauseOverlayEnabled = pauseOverlayEnabled,
              showParentalGuide = showParentalGuide,
 +            orientationPreference = orientationPreference,
 +            lastPlayerOrientation = lastPlayerOrientation,
@@ -1637,11 +2225,11 @@ index 66c26c8bae8e007aeacfbd1dee6b7a17ecda7836..23389fb8f52b3f09fa51bc844a46a5e7
              holdToSpeedEnabled = holdToSpeedEnabled,
              holdToSpeedValue = holdToSpeedValue,
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.kt
-index 81525b55d4efd986555592efc7ba8a827cb137a0..d5cc5aa3e179a2b8f92cc1b279fbef1b198d8442 100644
+index 7e15daa0b8c399e1f83a901fa03a7391a5cc31b6..732e209aeb3e04bd47870c2b6c55ba64396ec26d 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.kt
-@@ -7,6 +7,10 @@ internal expect object PlayerSettingsStorage {
-     fun saveShowLoadingOverlay(enabled: Boolean)
+@@ -11,6 +11,10 @@ internal expect object PlayerSettingsStorage {
+     fun savePauseOverlayEnabled(enabled: Boolean)
      fun loadShowParentalGuide(): Boolean?
      fun saveShowParentalGuide(enabled: Boolean)
 +    fun loadOrientationPreference(): String?
@@ -1652,14 +2240,29 @@ index 81525b55d4efd986555592efc7ba8a827cb137a0..d5cc5aa3e179a2b8f92cc1b279fbef1b
      fun saveResizeMode(mode: String)
      fun loadHoldToSpeedEnabled(): Boolean?
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt
-index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a81744448b 100644
+index 1c621672414b4326a86542404abfbb50c81c671d..05371026d556b8c597a9e7920b70867b67517e15 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/SubtitleModal.kt
-@@ -32,12 +32,15 @@ import androidx.compose.material.icons.rounded.Check
+@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.PaddingValues
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.IntrinsicSize
++import androidx.compose.foundation.layout.fillMaxHeight
+ import androidx.compose.foundation.layout.heightIn
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+@@ -32,12 +35,20 @@ import androidx.compose.material.icons.rounded.Check
  import androidx.compose.material.icons.rounded.CloudDownload
  import androidx.compose.material3.Icon
  import androidx.compose.material3.MaterialTheme
 +import androidx.compose.material3.TextButton
++import androidx.compose.material3.OutlinedButton
++import androidx.compose.material3.FilterChip
++import androidx.compose.material3.Tab
++import androidx.compose.material3.TabRow
++import androidx.compose.material.icons.rounded.ArrowDropDown
  import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
  import androidx.compose.runtime.LaunchedEffect
@@ -1671,7 +2274,15 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
  import androidx.compose.runtime.setValue
  import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
-@@ -124,6 +127,7 @@ fun SubtitleModal(
+@@ -48,6 +59,7 @@ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
+ import com.nuvio.app.core.ui.nuvio
+ import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
++import nuvio.composeapp.generated.resources.compose_action_off
+ import nuvio.composeapp.generated.resources.Res
+ import nuvio.composeapp.generated.resources.addon_title
+ import nuvio.composeapp.generated.resources.compose_player_built_in
+@@ -124,6 +136,7 @@ fun SubtitleModal(
                  ?: SubtitleOffLanguageKey,
          )
      }
@@ -1679,7 +2290,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
      var pendingOptionId by remember(visible) { mutableStateOf<String?>(playbackOptionId) }
      val options = remember(activeLanguageKey, subtitleStructureKey, addonStructureKey) {
          buildSubtitleSelectionOptions(activeLanguageKey, subtitleTracks, addonSubtitles)
-@@ -135,18 +139,6 @@ fun SubtitleModal(
+@@ -135,18 +148,6 @@ fun SubtitleModal(
      val styleVisible = activeLanguageKey != SubtitleOffLanguageKey &&
          selectedOptionId != null && options.any { it.id == selectedOptionId }
  
@@ -1698,7 +2309,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
  
      LaunchedEffect(languageItems) {
          if (languageItems.none { it.key == activeLanguageKey }) {
-@@ -163,155 +155,255 @@ fun SubtitleModal(
+@@ -163,155 +164,279 @@ fun SubtitleModal(
          }
      }
  
@@ -1776,17 +2387,21 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
 +                CompactPlayerTrackSheet(
 +                    title = stringResource(Res.string.compose_player_subtitles),
 +                    onDismiss = onDismiss,
++                    fillAvailableHeight = true,
                  ) {
 -                    SubtitleRail(
 -                        title = stringResource(Res.string.compose_player_languages),
 -                        width = 200.dp,
--                    ) {
--                        LazyColumn(
 +                    // Navigation stays outside the scrolling content, regardless of track count.
-+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-+                        TextButton(
++                    Row(
++                        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
++                        horizontalArrangement = Arrangement.spacedBy(12.dp),
++                        verticalAlignment = Alignment.CenterVertically,
++                    ) {
++                        OutlinedButton(
 +                            onClick = { compactPage = "languages" },
-+                            modifier = Modifier.weight(1f).testTag("subtitle-language-picker"),
++                            shape = RoundedCornerShape(16.dp),
++                            modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp).testTag("subtitle-language-picker"),
 +                        ) {
 +                            Text(
 +                                text = when (activeLanguageKey) {
@@ -1794,26 +2409,45 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
 +                                    SubtitleUnknownLanguageKey -> stringResource(Res.string.subtitle_language_unknown)
 +                                    else -> languageLabelForCode(activeLanguageKey)
 +                                },
++                                modifier = Modifier.weight(1f),
++                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
 +                                maxLines = 2,
 +                            )
++                            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
 +                        }
-+                        TextButton(
++                        FilterChip(
++                            selected = activeLanguageKey == SubtitleOffLanguageKey,
 +                            onClick = {
 +                                languageItems.firstOrNull { it.key == SubtitleOffLanguageKey }?.let(selectLanguage)
 +                                compactPage = "tracks"
 +                            },
-+                            modifier = Modifier.testTag("subtitle-off"),
-+                        ) { Text(stringResource(Res.string.compose_player_none)) }
++                            modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp).testTag("subtitle-off"),
++                            shape = RoundedCornerShape(16.dp),
++                            label = {
++                                Text(stringResource(Res.string.compose_action_off),
++                                    modifier = Modifier.fillMaxWidth(),
++                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
++                            },
++                        )
 +                    }
-+                    Row(Modifier.fillMaxWidth()) {
-+                        TextButton(
++                    TabRow(
++                        selectedTabIndex = if (compactPage == "style") 1 else 0,
++                        containerColor = Color.Transparent,
++                        contentColor = Color.White,
+                     ) {
+-                        LazyColumn(
++                        Tab(
++                            selected = compactPage != "style",
 +                            onClick = { compactPage = "tracks" },
-+                            modifier = Modifier.weight(1f).testTag("subtitle-tracks-tab"),
-+                        ) { Text(stringResource(Res.string.compose_player_subtitles)) }
-+                        TextButton(
++                            modifier = Modifier.testTag("subtitle-tracks-tab"),
++                            text = { Text(stringResource(Res.string.compose_player_subtitles)) },
++                        )
++                        Tab(
++                            selected = compactPage == "style",
 +                            onClick = { compactPage = "style" },
-+                            modifier = Modifier.weight(1f).testTag("subtitle-style-tab"),
-+                        ) { Text(stringResource(Res.string.compose_player_style)) }
++                            modifier = Modifier.testTag("subtitle-style-tab"),
++                            text = { Text(stringResource(Res.string.compose_player_style)) },
++                        )
 +                    }
 +                    when (compactPage) {
 +                        "languages" -> LazyColumn(
@@ -2074,7 +2708,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
                              }
                          }
                      }
-@@ -321,6 +413,39 @@ fun SubtitleModal(
+@@ -321,6 +446,39 @@ fun SubtitleModal(
      }
  }
  
@@ -2114,7 +2748,7 @@ index 1c621672414b4326a86542404abfbb50c81c671d..c25b81b645057bedc65f7b4bf1b9b6a8
  @Composable
  private fun SubtitleRail(
      title: String,
-@@ -531,8 +656,11 @@ private fun SubtitleRailEmptyState(
+@@ -531,8 +689,11 @@ private fun SubtitleRailEmptyState(
          }
          Text(
              text = text,
@@ -2254,10 +2888,10 @@ index dd1f5b329e1b19441c6f9eb168eb48e333970697..c6b4d450d71608b977bc6072adfa720b
              selectedAddonSubtitle == null -> {
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchBrowseContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchBrowseContent.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..0004c309b5bcbaf837039c8baa8833f56a31ee82
+index 0000000000000000000000000000000000000000..2d3ddb1e7e91ad5747eea7e43d1e25832337f047
 --- /dev/null
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchBrowseContent.kt
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,166 @@
 +package com.nuvio.app.features.search
 +
 +import androidx.compose.foundation.background
@@ -2291,6 +2925,8 @@ index 0000000000000000000000000000000000000000..0004c309b5bcbaf837039c8baa8833f5
 +import androidx.compose.ui.text.style.TextOverflow
 +import androidx.compose.ui.unit.dp
 +import com.nuvio.app.core.ui.nuvioConsumePointerEvents
++import nuvio.composeapp.generated.resources.compose_nav_search
++import nuvio.composeapp.generated.resources.compose_search_discover_title
 +import nuvio.composeapp.generated.resources.Res
 +import nuvio.composeapp.generated.resources.compose_search_recent_searches
 +import nuvio.composeapp.generated.resources.compose_search_remove_recent_search
@@ -2395,8 +3031,35 @@ index 0000000000000000000000000000000000000000..0004c309b5bcbaf837039c8baa8833f5
 +        }
 +    }
 +}
++
++/** Use the section boundary, not a hard-coded scroll distance or history length. */
++@Composable
++internal fun SearchContextHeader(
++    listState: androidx.compose.foundation.lazy.LazyListState,
++    query: String,
++    isSearchFocused: Boolean,
++    hasHistory: Boolean,
++    modifier: Modifier = Modifier,
++) {
++    val showDiscover by androidx.compose.runtime.remember(listState, query, isSearchFocused, hasHistory) {
++        androidx.compose.runtime.derivedStateOf {
++            val headingIndex = if (hasHistory) 1 else 0
++            query.isBlank() && !isSearchFocused && listState.firstVisibleItemIndex > headingIndex
++        }
++    }
++    androidx.compose.animation.Crossfade(
++        targetState = showDiscover,
++        animationSpec = androidx.compose.animation.core.tween(180),
++        label = "Search section title",
++    ) { discover ->
++        com.nuvio.app.core.ui.NuvioScreenHeader(
++            title = stringResource(if (discover) Res.string.compose_search_discover_title else Res.string.compose_nav_search),
++            modifier = modifier,
++        )
++    }
++}
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt
-index 95f354cfcc3eb635e021392f72b14ee21cbe70dc..ce93a3cd83159c6015ffdf95901897156d062f9b 100644
+index c1a42d965b237288670ed7e37ccffb463bdd3a34..05c402113dd7f91b61404d2e5fc6d1ddf9582d59 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchDiscoverContent.kt
 @@ -112,7 +112,7 @@ internal fun DiscoverSectionHeader(modifier: Modifier = Modifier) {
@@ -2409,7 +3072,7 @@ index 95f354cfcc3eb635e021392f72b14ee21cbe70dc..ce93a3cd83159c6015ffdf9590189715
      )
  }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt
-index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d417ba9281f 100644
+index 52ab7a54d715f9f2e920b6e381040ad25b0e93ab..52b37510785a628924382e07b83dc458987a8a4f 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt
 @@ -1,18 +1,12 @@
@@ -2431,38 +3094,31 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
  import androidx.compose.foundation.lazy.items
  import androidx.compose.foundation.lazy.LazyListState
  import androidx.compose.foundation.lazy.rememberLazyListState
-@@ -21,10 +15,8 @@ import androidx.compose.material.icons.rounded.Close
+@@ -21,7 +15,6 @@ import androidx.compose.material.icons.rounded.Close
  import androidx.compose.material3.Icon
  import androidx.compose.material3.IconButton
  import androidx.compose.material3.MaterialTheme
 -import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
  import androidx.compose.runtime.LaunchedEffect
--import androidx.compose.runtime.derivedStateOf
- import androidx.compose.runtime.getValue
- import androidx.compose.runtime.mutableStateOf
- import androidx.compose.runtime.remember
-@@ -32,11 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
+ import androidx.compose.foundation.gestures.stopScroll
+@@ -33,7 +26,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
  import androidx.compose.runtime.snapshotFlow
  import androidx.compose.runtime.setValue
  import androidx.compose.ui.Modifier
 -import androidx.compose.ui.Alignment
  import androidx.compose.ui.focus.FocusRequester
  import androidx.compose.ui.focus.focusRequester
--import androidx.compose.ui.text.font.FontWeight
--import androidx.compose.ui.text.style.TextOverflow
- import androidx.compose.ui.unit.dp
- import androidx.lifecycle.compose.collectAsStateWithLifecycle
- import com.nuvio.app.core.network.NetworkCondition
-@@ -45,7 +34,6 @@ import com.nuvio.app.core.ui.NuvioInputField
+ import androidx.compose.ui.focus.onFocusChanged
+@@ -47,7 +39,6 @@ import com.nuvio.app.core.ui.NuvioInputField
  import com.nuvio.app.core.ui.NuvioScreen
  import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
  import com.nuvio.app.core.ui.NuvioScreenHeader
 -import com.nuvio.app.core.ui.nuvioConsumePointerEvents
  import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
+ import com.nuvio.app.core.ui.ScreenActivityEffect
  import com.nuvio.app.features.addons.AddonRepository
- import com.nuvio.app.features.addons.firstEnabledManifestError
-@@ -69,7 +57,6 @@ import nuvio.composeapp.generated.resources.Res
+@@ -72,7 +63,6 @@ import nuvio.composeapp.generated.resources.Res
  import nuvio.composeapp.generated.resources.action_retry
  import nuvio.composeapp.generated.resources.compose_nav_search
  import nuvio.composeapp.generated.resources.compose_search_clear
@@ -2470,7 +3126,7 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
  import nuvio.composeapp.generated.resources.compose_search_empty_failed_message
  import nuvio.composeapp.generated.resources.compose_search_empty_failed_title
  import nuvio.composeapp.generated.resources.compose_search_empty_no_active_addons_message
-@@ -79,8 +66,6 @@ import nuvio.composeapp.generated.resources.compose_search_empty_no_results_titl
+@@ -82,8 +72,6 @@ import nuvio.composeapp.generated.resources.compose_search_empty_no_results_titl
  import nuvio.composeapp.generated.resources.compose_search_empty_no_search_catalogs_message
  import nuvio.composeapp.generated.resources.compose_search_empty_no_search_catalogs_title
  import nuvio.composeapp.generated.resources.compose_search_placeholder
@@ -2479,7 +3135,7 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
  import org.jetbrains.compose.resources.stringResource
  
  @Composable
-@@ -120,11 +105,6 @@ fun SearchScreen(
+@@ -131,11 +119,6 @@ fun SearchScreen(
      var query by rememberSaveable { mutableStateOf("") }
      var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
      var observedOfflineState by remember { mutableStateOf(false) }
@@ -2489,9 +3145,9 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
 -        }
 -    }
  
-     LaunchedEffect(scrollToTopRequests) {
-         scrollToTopRequests.collect {
-@@ -221,11 +201,7 @@ fun SearchScreen(
+     ScreenActivityEffect(scrollToTopRequests) { screenActive ->
+         if (!screenActive) return@ScreenActivityEffect
+@@ -237,19 +220,15 @@ fun SearchScreen(
          val homeSectionPadding = remember(maxWidth) {
              homeSectionHorizontalPaddingForWidth(maxWidth.value)
          }
@@ -2500,11 +3156,32 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
 -            discoverInFocus -> stringResource(Res.string.compose_search_discover_title)
 -            else -> stringResource(Res.string.compose_nav_search)
 -        }
-+        val headerTitle = stringResource(Res.string.compose_nav_search)
  
          androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
              Box(modifier = Modifier.fillMaxWidth()) {
-@@ -270,38 +246,20 @@ fun SearchScreen(
+                 androidx.compose.foundation.layout.Column(
+                     modifier = Modifier.fillMaxWidth(),
+                 ) {
+-                    NuvioScreenHeader(
+-                        title = headerTitle,
++                    SearchContextHeader(
++                        listState = listState, query = query, isSearchFocused = isSearchFocused,
++                        hasHistory = recentSearches.isNotEmpty(),
+                         modifier = Modifier.padding(horizontal = 16.dp),
+                     )
+                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(6.dp))
+@@ -258,9 +237,7 @@ fun SearchScreen(
+                             value = query,
+                             onValueChange = { query = it },
+                             placeholder = stringResource(Res.string.compose_search_placeholder),
+-                            modifier = Modifier
+-                                .focusRequester(focusRequester)
+-                                .onFocusChanged { isSearchFocused = it.isFocused },
++                            modifier = Modifier.focusRequester(focusRequester).onFocusChanged { isSearchFocused = it.isFocused },
+                             trailingContent = if (query.isNotBlank()) {
+                                 {
+                                     IconButton(onClick = { query = "" }) {
+@@ -288,38 +265,20 @@ fun SearchScreen(
                  modifier = Modifier.weight(1f),
              ) {
                  if (query.isBlank()) {
@@ -2532,7 +3209,7 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
 -                    }
 -                }
 -                if (query.isBlank()) {
--                    if (recentSearches.isNotEmpty()) {
+-                    if (isSearchFocused && recentSearches.isNotEmpty()) {
 -                        item(key = "recent_searches") {
 -                            SearchRecentSection(
 -                                recentSearches = recentSearches,
@@ -2557,7 +3234,7 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
                      }
                      discoverContent(
                          state = discoverUiState,
-@@ -459,71 +417,3 @@ private fun SearchEmptyStateCard(
+@@ -477,71 +436,3 @@ private fun SearchEmptyStateCard(
          onActionClick = if (reason == SearchEmptyStateReason.RequestFailed) onRetry else null,
      )
  }
@@ -2630,7 +3307,7 @@ index 2577f2b8ee2cbacf05afcf97419e8283aa349d01..496c5711e894e05ff78d59622ba94d41
 -    }
 -}
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt
-index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68acd711aad 100644
+index 4bc3133f2145306722191337b4a0486cafb4214f..dcc36794bd7dcecbf0a0fb2e4fa0326564934446 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt
 @@ -66,6 +66,7 @@ import com.nuvio.app.features.player.localizedLabel
@@ -2649,7 +3326,7 @@ index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68a
      var showPreferredAudioDialog by remember { mutableStateOf(false) }
      var showSecondaryAudioDialog by remember { mutableStateOf(false) }
      var showPreferredSubtitleDialog by remember { mutableStateOf(false) }
-@@ -375,6 +377,15 @@ private fun PlaybackSettingsSection(
+@@ -391,6 +393,15 @@ private fun PlaybackSettingsSection(
                      onCheckedChange = PlayerSettingsRepository::setShowParentalGuide,
                  )
                  SettingsGroupDivider(isTablet = isTablet)
@@ -2665,7 +3342,7 @@ index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68a
                  // Player preference picker: Internal / External
                  SettingsNavigationRow(
                      title = stringResource(Res.string.settings_playback_player_preference),
-@@ -1297,6 +1308,21 @@ private fun PlaybackSettingsSection(
+@@ -1313,6 +1324,21 @@ private fun PlaybackSettingsSection(
          }
      }
  
@@ -2687,7 +3364,7 @@ index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68a
      if (showPreferredAudioDialog) {
          val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
          LanguageSelectionDialog(
-@@ -3665,3 +3691,19 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
+@@ -3681,3 +3707,19 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
  
  @Composable
  private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
@@ -2708,10 +3385,10 @@ index ddce3c8065c93de2da42ce6b2ad8081743b8cee3..d469092c71043d5353ceff2a3f7ce68a
 +        PlayerOrientationPreference.FollowDevice -> Res.string.settings_player_orientation_device_description
 +    }
 diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt
-index ebd9d8dfe31ae2f8fe520f59e3e63cf071da017f..b5f9640eeb8ff3f406a2f5db86bfa9aacec583e0 100644
+index 927cbcee6f61bec9ab8b4db7b8c8e651dfc1ffcd..95526e6736c1c1999bc8e32688a5209a0ed78aca 100644
 --- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt
 +++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt
-@@ -759,7 +759,7 @@ internal fun settingsSearchEntries(
+@@ -785,7 +785,7 @@ internal fun settingsSearchEntries(
          PlaybackSearchRow("home-hero", stringResource(Res.string.settings_homescreen_show_hero), stringResource(Res.string.settings_homescreen_show_hero_description)),
          PlaybackSearchRow("home-catalog-type", stringResource(Res.string.layout_catalog_type), stringResource(Res.string.layout_catalog_type_sub)),
          PlaybackSearchRow("home-hide-unreleased", stringResource(Res.string.layout_hide_unreleased), stringResource(Res.string.layout_hide_unreleased_sub)),
@@ -2720,36 +3397,94 @@ index ebd9d8dfe31ae2f8fe520f59e3e63cf071da017f..b5f9640eeb8ff3f406a2f5db86bfa9aa
          PlaybackSearchRow("home-catalogs", stringResource(Res.string.settings_homescreen_section_catalogs)),
      ).forEach { row ->
          addRow(
-diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt
-index ef4a8311459bec57b542d4aaecf775fd9b4a6f2c..cb5673bd43ca10047d4c4a95cec5440506adcbc8 100644
---- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt
-+++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt
-@@ -23,10 +23,9 @@ import kotlinx.coroutines.runBlocking
- import nuvio.composeapp.generated.resources.*
- import org.jetbrains.compose.resources.getString
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/UpdateChannelSettings.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/UpdateChannelSettings.kt
+index 684cd2de9484dc28cc63e30ce60938bc8bcc21ad..3da875f4a433affb3018a1d23da576a21fff759e 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/UpdateChannelSettings.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/UpdateChannelSettings.kt
+@@ -36,12 +36,15 @@ import org.jetbrains.compose.resources.stringResource
+ @OptIn(ExperimentalMaterial3Api::class)
+ @Composable
+ internal fun UpdateChannelSettingsRow(isTablet: Boolean) {
+-    val channel by UpdatePreferences.shared.channel.collectAsState()
++    val channel = UpdateChannel.STABLE
++    androidx.compose.runtime.LaunchedEffect(Unit) {
++        UpdatePreferences.shared.setChannel(UpdateChannel.STABLE)
++    }
+     var showDialog by rememberSaveable { mutableStateOf(false) }
+     val tokens = MaterialTheme.nuvio
+     SettingsNavigationRow(
+         title = stringResource(Res.string.updates_channel_title),
+-        description = stringResource(Res.string.updates_channel_description),
++        description = stringResource(Res.string.orientation_updates_stable_description),
+         icon = Icons.Rounded.SystemUpdate,
+         isTablet = isTablet,
+         trailingContent = {
+@@ -59,7 +62,7 @@ internal fun UpdateChannelSettingsRow(isTablet: Boolean) {
+                 Column(
+                     modifier = Modifier.selectableGroup().verticalScroll(rememberScrollState()),
+                 ) {
+-                    UpdateChannel.entries.forEach { option ->
++                    listOf(UpdateChannel.STABLE).forEach { option ->
+                         Row(
+                             modifier = Modifier.fillMaxWidth().selectable(
+                                 selected = option == channel,
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdaterRepository.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdaterRepository.kt
+index d595c09917e235c25e148f4c9e6fbca3b0d5cfbb..db5f068453a2600d6fe573feb49e01df9459503c 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdaterRepository.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdaterRepository.kt
+@@ -32,7 +32,7 @@ internal data class GitHubAssetDto(
+ internal class NoChannelReleaseException : IllegalStateException()
  
--private const val gitHubOwner = "luqmanfadlli"
--private const val gitHubRepo = "NuvioMobile-iOS"
-+private const val gitHubOwner = "Mindplayer99"
-+private const val gitHubRepo = "NuvioMobile-Enhanced"
- private const val gitHubApiBase = "https://api.github.com"
--private const val releaseChannelBranch = "enhanced"
+ private const val GITHUB_API_BASE = "https://api.github.com"
+-private const val GITHUB_OWNER = "luqmanfadlli"
++private const val GITHUB_OWNER = "Mindplayer99"
+ private const val GITHUB_REPO = "NuvioMobile-Enhanced"
  
- data class AppUpdate(
-     val tag: String,
-@@ -80,7 +79,7 @@ private class NoChannelReleaseException : IllegalStateException(
-     runBlocking { getString(Res.string.updates_no_channel_release) },
- )
- 
--private object VersionUtils {
-+internal object VersionUtils {
-     fun normalize(raw: String?): String {
-         if (raw.isNullOrBlank()) return ""
-         return raw.trim().removePrefix("v").removePrefix("V")
-@@ -117,6 +116,16 @@ private object VersionUtils {
+ internal object AppUpdaterRepository {
+@@ -44,7 +44,7 @@ internal object AppUpdaterRepository {
+     suspend fun getLatestChannelUpdate(channel: UpdateChannel): Result<AppUpdate> = runCatching {
+         val response = httpRequestRaw(
+             method = "GET",
+-            url = "$GITHUB_API_BASE/repos/$GITHUB_OWNER/$GITHUB_REPO/${releasePath(channel)}",
++            url = "$GITHUB_API_BASE/repos/$GITHUB_OWNER/$GITHUB_REPO/releases?per_page=100",
+             headers = mapOf(
+                 "Accept" to "application/vnd.github+json",
+                 "User-Agent" to "NuvioMobile",
+@@ -56,10 +56,25 @@ internal object AppUpdaterRepository {
+         if (response.status !in 200..299) {
+             error(getString(Res.string.updates_github_api_error, response.status))
+         }
+-        selectUpdate(response.body, channel, AppUpdaterPlatform.getSupportedAbis())
++        selectOrientationUpdate(response.body, AppUpdaterPlatform.getSupportedAbis())
+             ?: throw NoChannelReleaseException()
      }
- }
  
++    // Both persisted channel values stay within this signed fork's stable Orientation channel.
++    internal fun selectOrientationUpdate(responseBody: String, supportedAbis: List<String>): AppUpdate? {
++        if ("arm64-v8a" !in supportedAbis) return null
++        return json.decodeFromString<List<GitHubReleaseDto>>(responseBody)
++            .filter { !it.draft && !it.prerelease && OrientationUpdateChannel.matchesTag(it.tagName) }
++            .sortedByDescending { VersionUtils.parse(it.tagName!!.removeSuffix("-orientation")) }
++            .firstNotNullOfOrNull { release ->
++                val tag = release.tagName!!
++                val asset = release.assets.singleOrNull { it.name == OrientationUpdateChannel.assetName(tag) }
++                    ?: return@firstNotNullOfOrNull null
++                AppUpdate(tag, release.name?.takeIf { it.isNotBlank() } ?: tag, release.body.orEmpty(),
++                    release.htmlUrl, asset.name, asset.browserDownloadUrl, asset.size)
++            }
++    }
++
+     internal fun releasePath(channel: UpdateChannel): String = when (channel) {
+         UpdateChannel.STABLE -> "releases/latest"
+         UpdateChannel.BETA -> "releases?per_page=100"
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannel.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannel.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..64f1bd452880e9fffb7ed72cc99e0d776d75c1d6
+--- /dev/null
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannel.kt
+@@ -0,0 +1,11 @@
++package com.nuvio.app.features.updater
++
 +internal object OrientationUpdateChannel {
 +    private val tagPattern = Regex("[0-9]+\\.[0-9]+\\.[0-9]+-orientation")
 +
@@ -2759,76 +3494,21 @@ index ef4a8311459bec57b542d4aaecf775fd9b4a6f2c..cb5673bd43ca10047d4c4a95cec54405
 +        "Nuvio-Enhanced-${tag.removeSuffix("-orientation")}-Orientation-Full-arm64-v8a.apk"
 +    } else null
 +}
-+
- private object AppUpdaterRepository {
-     suspend fun getLatestChannelUpdate(): Result<AppUpdate> = runCatching {
-         val response = httpRequestRaw(
-@@ -133,14 +142,21 @@ private object AppUpdaterRepository {
-         }
+diff --git a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/VersionUtils.kt b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/VersionUtils.kt
+index bfddef96d21b96706866fa23ac534d3cbe83c437..a18d686ed7dc2208ae38cff2d472196e1af2f90d 100644
+--- a/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/VersionUtils.kt
++++ b/composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/VersionUtils.kt
+@@ -71,8 +71,8 @@ internal object VersionUtils {
+     fun isPrerelease(raw: String?): Boolean = parse(raw)?.prerelease?.isNotEmpty() == true
  
-         val releases = appUpdaterJson.decodeFromString<List<GitHubReleaseDto>>(response.body)
--        val release = releases.firstOrNull { it.matchesRequestedChannel() && !it.draft && !it.prerelease }
-+        val release = releases.filter { OrientationUpdateChannel.matchesTag(it.tagName) && !it.draft && !it.prerelease }
-+            .maxWithOrNull(Comparator { left, right ->
-+                when {
-+                    VersionUtils.isRemoteNewer(left.tagName, right.tagName) -> 1
-+                    VersionUtils.isRemoteNewer(right.tagName, left.tagName) -> -1
-+                    else -> 0
-+                }
-+            })
-             ?: throw NoChannelReleaseException()
- 
-         val tag = release.tagName?.takeIf { it.isNotBlank() }
-             ?: release.name?.takeIf { it.isNotBlank() }
-             ?: error(getString(Res.string.updates_release_missing_title))
- 
--        val asset = chooseBestApkAsset(release.assets)
-+        val asset = chooseBestApkAsset(release.assets, tag)
-             ?: error(getString(Res.string.updates_apk_asset_missing))
- 
-         AppUpdate(
-@@ -154,37 +170,10 @@ private object AppUpdaterRepository {
-         )
-     }
- 
--    private fun GitHubReleaseDto.matchesRequestedChannel(): Boolean {
--        val channel = releaseChannelBranch
--        if (targetCommitish?.trim()?.equals(channel, ignoreCase = true) == true) {
--            return true
--        }
--
--        return listOf(tagName, name)
--            .filterNotNull()
--            .any { value -> value.contains(channel, ignoreCase = true) }
--    }
--
--    private fun chooseBestApkAsset(assets: List<GitHubAssetDto>): GitHubAssetDto? {
--        val apkAssets = assets.filter { asset ->
--            asset.name.endsWith(".apk", ignoreCase = true) ||
--                asset.contentType == "application/vnd.android.package-archive"
--        }
--        if (apkAssets.isEmpty()) return null
--        if (apkAssets.size == 1) return apkAssets.first()
--
--        val supportedAbis = AppUpdaterPlatform.getSupportedAbis()
--        for (abi in supportedAbis) {
--            val candidate = apkAssets.firstOrNull { asset ->
--                asset.name.contains(abi, ignoreCase = true)
--            }
--            if (candidate != null) return candidate
--        }
--
--        return apkAssets.firstOrNull { asset ->
--            val name = asset.name.lowercase()
--            name.contains("universal") || name.contains("all")
--        } ?: apkAssets.first()
-+    private fun chooseBestApkAsset(assets: List<GitHubAssetDto>, tag: String): GitHubAssetDto? {
-+        if ("arm64-v8a" !in AppUpdaterPlatform.getSupportedAbis()) return null
-+        val expectedName = OrientationUpdateChannel.assetName(tag) ?: return null
-+        return assets.singleOrNull { it.name == expectedName }
+     fun isRemoteNewer(remote: String?, local: String?): Boolean {
+-        val remoteVersion = parse(remote) ?: return false
+-        val localVersion = parse(local) ?: return false
++        val remoteVersion = parse(remote?.removeSuffix("-orientation")) ?: return false
++        val localVersion = parse(local?.removeSuffix("-orientation")) ?: return false
+         return remoteVersion > localVersion
      }
  }
- 
 diff --git a/composeApp/src/commonTest/kotlin/com/nuvio/app/features/player/PlayerOrientationTest.kt b/composeApp/src/commonTest/kotlin/com/nuvio/app/features/player/PlayerOrientationTest.kt
 new file mode 100644
 index 0000000000000000000000000000000000000000..7df46b36a63b483dbe46ac10d0b248ff8aaa967a
@@ -2950,10 +3630,10 @@ index 0000000000000000000000000000000000000000..7df46b36a63b483dbe46ac10d0b248ff
 +}
 diff --git a/composeApp/src/commonTest/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannelTest.kt b/composeApp/src/commonTest/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannelTest.kt
 new file mode 100644
-index 0000000000000000000000000000000000000000..9ad7b63cacefe3c1c732cb3da3a40675c1e030d2
+index 0000000000000000000000000000000000000000..892ed07a843c369ec821e2d4eace412e1ac70356
 --- /dev/null
 +++ b/composeApp/src/commonTest/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannelTest.kt
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,47 @@
 +package com.nuvio.app.features.updater
 +
 +import kotlin.test.Test
@@ -2981,16 +3661,38 @@ index 0000000000000000000000000000000000000000..9ad7b63cacefe3c1c732cb3da3a40675
 +            OrientationUpdateChannel.assetName("0.4.16-orientation"))
 +        assertNull(OrientationUpdateChannel.assetName("0.4.16"))
 +    }
++    @Test fun `production selector ignores upstream beta draft and wrong assets`() {
++        val response = """[
++          {"tag_name":"0.4.24-beta","assets":[{"name":"app-arm64-v8a.apk","browser_download_url":"wrong"}]},
++          {"tag_name":"0.4.23-orientation","prerelease":true,"assets":[{"name":"Nuvio-Enhanced-0.4.23-Orientation-Full-arm64-v8a.apk","browser_download_url":"beta"}]},
++          {"tag_name":"0.4.25-orientation","draft":true,"assets":[{"name":"Nuvio-Enhanced-0.4.25-Orientation-Full-arm64-v8a.apk","browser_download_url":"draft"}]},
++          {"tag_name":"0.4.26-orientation","assets":[{"name":"app-arm64-v8a.apk","browser_download_url":"wrong-asset"}]},
++          {"tag_name":"0.4.22-orientation","assets":[{"name":"Nuvio-Enhanced-0.4.22-Orientation-Full-arm64-v8a.apk","browser_download_url":"verified"}]},
++          {"tag_name":"0.4.17-orientation-ui.3","assets":[{"name":"app.apk","browser_download_url":"ui"}]}
++        ]"""
++        assertEquals("verified", AppUpdaterRepository.selectOrientationUpdate(response, listOf("arm64-v8a"))?.assetUrl)
++        assertNull(AppUpdaterRepository.selectOrientationUpdate(response, listOf("x86_64")))
++        assertNull(AppUpdaterRepository.selectOrientationUpdate("[]", listOf("arm64-v8a")))
++    }
++
++    @Test fun `duplicate exact assets are ambiguous and cannot update`() {
++        val asset = """{"name":"Nuvio-Enhanced-0.4.22-Orientation-Full-arm64-v8a.apk","browser_download_url":"url"}"""
++        assertNull(AppUpdaterRepository.selectOrientationUpdate(
++            """[{"tag_name":"0.4.22-orientation","assets":[$asset,$asset]}]""", listOf("arm64-v8a")))
++    }
 +}
 diff --git a/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.ios.kt b/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.ios.kt
-index c0462bd4a14b1cf90e7cd927c9ba53af4f657eeb..0213462dc88a709503009f6e30502b0fd7cc0d60 100644
+index 316cf9468b3eeb5601bb3f5d5938039713837255..d1175d9b32fc77292dd93df7e0aeccc40bef1a29 100644
 --- a/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.ios.kt
 +++ b/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.ios.kt
-@@ -16,7 +16,16 @@ private const val lockPlayerToLandscapeNotification = "NuvioPlayerLockLandscape"
+@@ -18,6 +18,18 @@ private const val lockPlayerToLandscapeNotification = "NuvioPlayerLockLandscape"
  private const val unlockPlayerOrientationNotification = "NuvioPlayerUnlockOrientation"
+ private var playerLandscapeLockCount = 0
  
- @Composable
--actual fun LockPlayerToLandscape() {
++@Composable
++actual fun KeepPlayerOrientationUntilExit(settings: PlayerSettingsUiState) = LockPlayerToLandscape()
++
++@Composable
 +actual fun rememberPlayerOrientationControl(
 +    sessionKey: String,
 +    settings: PlayerSettingsUiState,
@@ -2999,18 +3701,16 @@ index c0462bd4a14b1cf90e7cd927c9ba53af4f657eeb..0213462dc88a709503009f6e30502b0f
 +    return null
 +}
 +
-+@Composable
-+private fun LockPlayerToLandscape() {
+ @Composable
+ actual fun LockPlayerToLandscape() {
      DisposableEffect(Unit) {
-         NSNotificationCenter.defaultCenter.postNotificationName(
-             lockPlayerToLandscapeNotification,
 diff --git a/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.ios.kt b/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.ios.kt
-index 85c67a5522867c694c98794056e9f822bd3de744..d0df9eb09227ebf9b1d63ed1e80ede49b320b1bb 100644
+index 64a5c129d6bddf2a2a371a07845d4566d88ffc90..880ea00b3f450b9eb346c0e04fdb89f7b00755f2 100644
 --- a/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.ios.kt
 +++ b/composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerSettingsStorage.ios.kt
-@@ -19,6 +19,9 @@ import platform.Foundation.NSUserDefaults
- actual object PlayerSettingsStorage {
-     private const val showLoadingOverlayKey = "show_loading_overlay"
+@@ -21,6 +21,9 @@ actual object PlayerSettingsStorage {
+     private const val showPlayerLoadingStatusKey = "show_player_loading_status"
+     private const val pauseOverlayEnabledKey = "pause_overlay_enabled"
      private const val showParentalGuideKey = "show_parental_guide"
 +    // Phone orientation is local to this device and profile, not cloud-synced.
 +    private const val orientationPreferenceKey = "player_orientation_preference"
@@ -3018,7 +3718,7 @@ index 85c67a5522867c694c98794056e9f822bd3de744..d0df9eb09227ebf9b1d63ed1e80ede49
      private const val resizeModeKey = "resize_mode"
      private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
      private const val holdToSpeedValueKey = "hold_to_speed_value"
-@@ -207,6 +210,26 @@ actual object PlayerSettingsStorage {
+@@ -231,6 +234,26 @@ actual object PlayerSettingsStorage {
          NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(showParentalGuideKey))
      }
  

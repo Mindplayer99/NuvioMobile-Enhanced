@@ -7,7 +7,7 @@ s=importlib.util.spec_from_file_location('gate',Path(__file__).with_name('orient
 g=importlib.util.module_from_spec(s);s.loader.exec_module(g)
 class DifferentialTests(unittest.TestCase):
     def setUp(self):
-        self.good={f'com.nuvio.app.features.{area}.{name}#case':{'status':'passed','failures':[]} for area,name in [('player','PlayerOrientationTest'),('player','PlayerOrientationAndroidTest'),('updater','OrientationUpdateChannelTest')]}
+        self.good={f'com.nuvio.app.features.{area}.{name}#case':{'status':'passed','failures':[]} for area,name in [('player','PlayerOrientationTest'),('player','PlayerOrientationAndroidTest'),('updater','OrientationUpdateChannelTest'),('player','PlayerPolishLayoutTest'),('player','PortraitSubtitleViewportTest'),('player','PlayerOrientationExitTest'),('search','SearchBrowseLayoutTest')]}
         self.failure={'status':'failed','failures':[{'type':'AssertionError','message':'expected 60 actual 30','frames':[]}]}
     def test_identical_upstream_failure_allowed(self):
         c={**self.good,'unrelated#retry':self.failure}
@@ -32,4 +32,19 @@ class DifferentialTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/'evidence.json';p.write_text(json.dumps({'status':'blocked','commit':'x','upstream_commit':'y'}))
             with self.assertRaises(RuntimeError):g.validate(p,{'commit':'x','upstream_commit':'y'})
+    def test_harness_repair_rejects_other_versions_errors_and_patch(self):
+        import json
+        root=Path(__file__).resolve().parent.parent/'orientation'
+        metadata=json.loads((root/'upstream-0.4.22-test-harness.json').read_text())
+        patch_bytes=(root/'upstream-0.4.22-test-harness.patch').read_bytes()
+        log='\n'.join('e: file:///tmp/raw/'+e['path']+':1:2 '+e['message'] for e in metadata['expected_errors'])+'\nBUILD FAILED'
+        states=[{'path':':composeApp:compileAndroidHostTest','failed':True}]
+        self.assertEqual(len(g.check_harness_failure(g.HARNESS_COMMIT,metadata,log,states,patch_bytes)),13)
+        for commit, output, tasks, data in [
+            ('other',log,states,patch_bytes),
+            (g.HARNESS_COMMIT,log.replace("'DownloadSink'","'DifferentAPI'"),states,patch_bytes),
+            (g.HARNESS_COMMIT,log,states+[{'path':g.ASSEMBLE,'failed':True}],patch_bytes),
+            (g.HARNESS_COMMIT,log,states,patch_bytes+b'changed')]:
+            with self.assertRaises(RuntimeError):g.check_harness_failure(commit,metadata,output,tasks,data)
+
 if __name__=='__main__':unittest.main()
