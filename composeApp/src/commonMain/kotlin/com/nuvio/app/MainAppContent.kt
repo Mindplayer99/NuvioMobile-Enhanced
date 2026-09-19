@@ -135,7 +135,7 @@ import com.nuvio.app.features.player.PlayerPlaybackSnapshot
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.prepareExternalPlayerLaunch
-import com.nuvio.app.features.player.LockPlayerToLandscape
+import com.nuvio.app.features.player.KeepPlayerOrientationUntilExit
 import com.nuvio.app.features.player.HidePlayerSystemBars
 import com.nuvio.app.features.player.rememberExternalPlayerLauncher
 import com.nuvio.app.features.profiles.ProfileEditScreen
@@ -323,7 +323,7 @@ internal fun MainAppContent(
     var visiblePlayerEntries by remember { mutableIntStateOf(0) }
     var streamLandscapeLoadingVisible by remember(currentRoute) { mutableStateOf(false) }
     if (currentRoute is PlayerRoute || visiblePlayerEntries > 0 || streamLandscapeLoadingVisible) {
-        LockPlayerToLandscape()
+        KeepPlayerOrientationUntilExit(playerSettingsUiState)
         HidePlayerSystemBars()
     }
     val p2pSettingsUiState by remember {

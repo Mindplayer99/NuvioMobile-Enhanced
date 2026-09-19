@@ -32,7 +32,7 @@ internal data class GitHubAssetDto(
 internal class NoChannelReleaseException : IllegalStateException()
 
 private const val GITHUB_API_BASE = "https://api.github.com"
-private const val GITHUB_OWNER = "luqmanfadlli"
+private const val GITHUB_OWNER = "Mindplayer99"
 private const val GITHUB_REPO = "NuvioMobile-Enhanced"
 
 internal object AppUpdaterRepository {
@@ -44,7 +44,7 @@ internal object AppUpdaterRepository {
     suspend fun getLatestChannelUpdate(channel: UpdateChannel): Result<AppUpdate> = runCatching {
         val response = httpRequestRaw(
             method = "GET",
-            url = "$GITHUB_API_BASE/repos/$GITHUB_OWNER/$GITHUB_REPO/${releasePath(channel)}",
+            url = "$GITHUB_API_BASE/repos/$GITHUB_OWNER/$GITHUB_REPO/releases?per_page=100",
             headers = mapOf(
                 "Accept" to "application/vnd.github+json",
                 "User-Agent" to "NuvioMobile",
@@ -56,8 +56,23 @@ internal object AppUpdaterRepository {
         if (response.status !in 200..299) {
             error(getString(Res.string.updates_github_api_error, response.status))
         }
-        selectUpdate(response.body, channel, AppUpdaterPlatform.getSupportedAbis())
+        selectOrientationUpdate(response.body, AppUpdaterPlatform.getSupportedAbis())
             ?: throw NoChannelReleaseException()
+    }
+
+    // Both persisted channel values stay within this signed fork's stable Orientation channel.
+    internal fun selectOrientationUpdate(responseBody: String, supportedAbis: List<String>): AppUpdate? {
+        if ("arm64-v8a" !in supportedAbis) return null
+        return json.decodeFromString<List<GitHubReleaseDto>>(responseBody)
+            .filter { !it.draft && !it.prerelease && OrientationUpdateChannel.matchesTag(it.tagName) }
+            .sortedByDescending { VersionUtils.parse(it.tagName!!.removeSuffix("-orientation")) }
+            .firstNotNullOfOrNull { release ->
+                val tag = release.tagName!!
+                val asset = release.assets.singleOrNull { it.name == OrientationUpdateChannel.assetName(tag) }
+                    ?: return@firstNotNullOfOrNull null
+                AppUpdate(tag, release.name?.takeIf { it.isNotBlank() } ?: tag, release.body.orEmpty(),
+                    release.htmlUrl, asset.name, asset.browserDownloadUrl, asset.size)
+            }
     }
 
     internal fun releasePath(channel: UpdateChannel): String = when (channel) {

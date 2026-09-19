@@ -768,14 +768,14 @@
     <string name="settings_homescreen_section_catalogs_collections">CATALOGS &amp; COLLECTIONS</string>
     <string name="settings_homescreen_section_collections">COLLECTIONS</string>
     <string name="settings_homescreen_section_hero">HOME LAYOUT</string>
-    <string name="settings_homescreen_section_hero_sources">HERO CONFIGS</string>
+    <string name="settings_homescreen_section_hero_sources">HERO</string>
     <string name="settings_homescreen_hero_style">Hero Style</string>
     <string name="settings_homescreen_hero_style_description">How the featured artwork is framed at the top of the home screen.</string>
     <string name="settings_homescreen_hero_style_full_bleed">Full-bleed</string>
     <string name="settings_homescreen_hero_style_full_bleed_description">Nuvio Default. Artwork fills the width of the screen.</string>
     <string name="settings_homescreen_hero_style_card">Card</string>
-    <string name="settings_homescreen_hero_style_card_description">A clean rounded shaped card.</string>
-    <string name="settings_homescreen_catalogs_source">Catalogs Source</string>
+    <string name="settings_homescreen_hero_style_card_description">Show artwork inside a rounded card.</string>
+    <string name="settings_homescreen_catalogs_source">Hero catalogs</string>
     <string name="settings_homescreen_selected_count">%1$d of %2$d selected</string>
     <string name="settings_homescreen_show_hero">Show Hero Section</string>
     <string name="settings_homescreen_show_hero_description">Display hero carousel at top of home.</string>
@@ -1403,7 +1403,7 @@
     <string name="settings_trakt_features">FEATURES</string>
     <string name="settings_trakt_finish_sign_in">Finish connection approval</string>
     <string name="settings_trakt_intro_description">Sync your watchlist, watch progress, continue watching, scrobbles, and personal lists with Trakt.</string>
-    <string name="settings_trakt_missing_credentials">Missing TRAKT_CLIENT_ID / TRAKT_CLIENT_SECRET in local.properties.</string>
+    <string name="settings_trakt_missing_credentials">Trakt is unavailable in this build. The app developer must configure Trakt before you can connect.</string>
     <string name="settings_trakt_open_login">Open Trakt Login</string>
     <string name="settings_trakt_open_activate">Open Trakt Activate</string>
     <string name="settings_trakt_save_actions_description">Sync your watchlist, watch progress, continue watching, scrobbles, and personal lists with Trakt.</string>
@@ -1450,7 +1450,7 @@
     <string name="settings_simkl_finish_sign_in">Finish connection approval</string>
     <string name="settings_simkl_open_login">Open Simkl Login</string>
     <string name="settings_simkl_sign_in_description">Connect Simkl to sync lists, watched history, playback progress, and scrobbles.</string>
-    <string name="settings_simkl_missing_credentials">Missing SIMKL_CLIENT_ID</string>
+    <string name="settings_simkl_missing_credentials">Simkl is unavailable in this build. The app developer must configure Simkl before you can connect.</string>
     <string name="settings_simkl_visit">Visit Simkl</string>
     <string name="settings_simkl_invalid_callback">Simkl did not accept the sign-in callback. Please try again.</string>
     <string name="settings_simkl_authorization_expired">Simkl code expired. Start again.</string>
