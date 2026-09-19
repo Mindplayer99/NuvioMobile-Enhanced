@@ -1,0 +1,58 @@
+name: Verify and deliver 0.4.22 label alignment fixes
+on:
+  push:
+    branches: [ops/orientation-0422-labels]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: orientation-releases
+  cancel-in-progress: false
+env:
+  GH_TOKEN: ${{ github.token }}
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Reproduce exact candidate and test automation gates
+        run: |
+          python3 scripts/test-orientation-release.py
+          python3 scripts/test-orientation-sync.py
+          python3 scripts/test-orientation-risk.py
+          python3 scripts/test-orientation-tests.py
+          git worktree add --detach "$RUNNER_TEMP/labels-source" 264594455fae2ccae1bf7ab10c7af66866bdf95d
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Configure original signing identity
+        env:
+          NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+          NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: python3 scripts/orientation-release.py configure --source "$RUNNER_TEMP/labels-source"
+      - name: Focused layout checks, full regression comparison and Full ARM64 build
+        run: python3 scripts/orientation-label-fix.py verify
+      - name: Draft upload, remote APK verification, publish and update canonical patch
+        run: python3 scripts/orientation-label-fix.py publish
+      - name: Preserve evidence and rendered layouts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orientation-0422-label-fix
+          path: |
+            ${{ runner.temp }}/labels-report/
+            ${{ runner.temp }}/labels-source/composeApp/build/reports/ui-polish/
+            ${{ runner.temp }}/labels-source/composeApp/build/test-results/
+      - name: Remove private configuration
+        if: always()
+        run: rm -f "$RUNNER_TEMP/orientation-release.jks" "$RUNNER_TEMP/labels-source/local.properties"

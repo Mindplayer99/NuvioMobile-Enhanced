@@ -3,9 +3,9 @@
   "upstream_repository": "luqmanfadlli/NuvioMobile-Enhanced",
   "base_tag": "0.4.22",
   "base_commit": "50b9194ce5ba7c06ff3709ec525087fa31ce4323",
-  "orientation_commit": "6545296fb17f2be433ebe2288a23001c54bb8586",
+  "orientation_commit": "264594455fae2ccae1bf7ab10c7af66866bdf95d",
   "initial_version_code": 127,
-  "patch_sha256": "11eff3ffee2e97853e8e395c34dac208454cdfc02c8b8c8c4a9fc8c366c9c73b",
+  "patch_sha256": "445fcd1afe025f4645efa2b0e0ef5060fc16a170c8031e57446c12225ad0509c",
   "delta_paths": [
     "androidApp/build.gradle.kts",
     "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/downloads/AndroidDownloadTransferTest.kt",
@@ -56,5 +56,7 @@
   "package": "com.nuvio.media",
   "certificate_sha256": "99e3d93e7600c178e71bf80ded2b1d97664e3ef14058c473c4617cb27fd04e35",
   "previous_verified_ui_source": "463cb7b3bfe26735f226c46917685d77b4a78df0",
-  "previous_verified_ui_run": "34949140836"
+  "previous_verified_ui_run": "34949140836",
+  "verified_ui_source": "264594455fae2ccae1bf7ab10c7af66866bdf95d",
+  "verified_ui_release": "0.4.22-orientation-ui.1"
 }
