@@ -15,8 +15,8 @@ s = importlib.util.spec_from_file_location('release', Path(__file__).with_name('
 release = importlib.util.module_from_spec(s); s.loader.exec_module(release)
 TASK = ':composeApp:testAndroidHostTest'
 ASSEMBLE = ':androidApp:assembleFullRelease'
-CRITICAL = ('.features.player.', '.features.updater.', '.features.downloads.')
-REQUIRED = ('PlayerOrientationTest', 'PlayerOrientationAndroidTest', 'OrientationUpdateChannelTest')
+CRITICAL = ('.features.player.', '.features.updater.', '.features.downloads.', '.features.search.SearchBrowseLayoutTest')
+REQUIRED = ('PlayerOrientationTest', 'PlayerOrientationAndroidTest', 'OrientationUpdateChannelTest', 'PlayerPolishLayoutTest', 'PortraitSubtitleViewportTest', 'PlayerOrientationExitTest', 'SearchBrowseLayoutTest')
 FLAGS = ['-Pnuvio.android.distribution=full', '--parallel', '--max-workers=2',
          '-Dorg.gradle.jvmargs=-Xmx4g', '-Pkotlin.daemon.jvmargs=-Xmx2g', '--console=plain', '--no-configuration-cache']
 

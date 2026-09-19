@@ -1,14 +1,15 @@
 {
   "schema": 1,
   "upstream_repository": "luqmanfadlli/NuvioMobile-Enhanced",
-  "base_tag": "0.4.17",
-  "base_commit": "8457cbf009a0453f709ff787f09ef03e858b50c1",
-  "orientation_commit": "794601466893eae9f917bb3de449739f67c8e583",
-  "initial_version_code": 122,
-  "patch_sha256": "07dff72224985f6fe1f560305744a4c925330de1935dce5ed79159d4078a7e2b",
+  "base_tag": "0.4.22",
+  "base_commit": "50b9194ce5ba7c06ff3709ec525087fa31ce4323",
+  "orientation_commit": "1efe80398144e4dc2ea9f84e9c0f3008056e3af5",
+  "initial_version_code": 127,
+  "patch_sha256": "1572486428eb9e2b178e06e9172f4a6ed442bfc459b2b1de9573672f0373255a",
   "delta_paths": [
     "androidApp/build.gradle.kts",
     "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationAndroidTest.kt",
+    "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerOrientationExitTest.kt",
     "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PlayerPolishLayoutTest.kt",
     "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/player/PortraitSubtitleViewportTest.kt",
     "composeApp/src/androidHostTest/kotlin/com/nuvio/app/features/search/SearchBrowseLayoutTest.kt",
@@ -19,8 +20,10 @@
     "composeApp/src/commonMain/composeResources/values/player_orientation.xml",
     "composeApp/src/commonMain/composeResources/values/search_polish.xml",
     "composeApp/src/commonMain/composeResources/values/strings.xml",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/MainAppContent.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/AudioTrackModal.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/CompactPlayerTrackSheet.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerCaptionInsets.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerControls.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerLayout.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/player/PlayerOrientation.kt",
@@ -38,7 +41,10 @@
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/search/SearchScreen.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/PlaybackSettingsPage.kt",
     "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/SettingsSearch.kt",
-    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdater.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/settings/UpdateChannelSettings.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/AppUpdaterRepository.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannel.kt",
+    "composeApp/src/commonMain/kotlin/com/nuvio/app/features/updater/VersionUtils.kt",
     "composeApp/src/commonTest/kotlin/com/nuvio/app/features/player/PlayerOrientationTest.kt",
     "composeApp/src/commonTest/kotlin/com/nuvio/app/features/updater/OrientationUpdateChannelTest.kt",
     "composeApp/src/iosMain/kotlin/com/nuvio/app/features/player/PlayerPlatformEffects.ios.kt",
@@ -46,12 +52,6 @@
   ],
   "package": "com.nuvio.media",
   "certificate_sha256": "99e3d93e7600c178e71bf80ded2b1d97664e3ef14058c473c4617cb27fd04e35",
-  "verified_ui_source": "c9d91d761ad49f3d482bde3e42de8eab2470bbaf",
-  "verified_ui_run": "34857502906",
-  "canonical_exclusions": [
-    ".github/workflows/ui-polish.yml",
-    "scripts/verify-ui-polish.py",
-    "UI_POLISH.md",
-    "iosApp/Configuration/Version.xcconfig"
-  ]
+  "previous_verified_ui_source": "463cb7b3bfe26735f226c46917685d77b4a78df0",
+  "previous_verified_ui_run": "34949140836"
 }

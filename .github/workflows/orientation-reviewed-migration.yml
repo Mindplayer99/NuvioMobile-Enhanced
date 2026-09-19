@@ -1,0 +1,83 @@
+name: Verify and release reviewed stable 0.4.22 Orientation
+on:
+  push:
+    branches: [ops/orientation-0.4.22]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: orientation-releases
+  cancel-in-progress: false
+env:
+  GH_TOKEN: ${{ github.token }}
+jobs:
+  migrate:
+    if: github.repository == 'Mindplayer99/NuvioMobile-Enhanced'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Test source, risk and fail-closed publication gates
+        run: |
+          python3 scripts/test-orientation-release.py
+          python3 scripts/test-orientation-sync.py
+          python3 scripts/test-orientation-risk.py
+          python3 scripts/test-orientation-tests.py
+      - name: Reproduce reviewed integration from exact upstream
+        run: python3 scripts/orientation-reviewed-migration.py prepare
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Configure original signing identity
+        env:
+          NUVIO_RELEASE_KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+          NUVIO_LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: python3 scripts/orientation-release.py configure --source "$RUNNER_TEMP/orientation-source"
+      - name: Critical UI and orientation tests, full suite and Full ARM64 build, exact upstream failure comparison
+        run: python3 scripts/orientation-tests.py --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --report "$RUNNER_TEMP/orientation-reports"
+      - name: Verify signed APK and publish draft only after remote-byte verification
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find "$RUNNER_TEMP/orientation-source/androidApp/build/outputs/apk/full/release" -name '*.apk')
+          test "${#apks[@]}" = 1
+          python3 scripts/orientation-sync.py verify --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "${apks[0]}" --evidence "$RUNNER_TEMP/orientation-reports/test-evidence.json"
+          python3 scripts/orientation-sync.py publish --source "$RUNNER_TEMP/orientation-source" --plan "$RUNNER_TEMP/orientation-plan.json" --apk "${apks[0]}" --evidence "$RUNNER_TEMP/orientation-reports/test-evidence.json"
+      - name: Activate exact canonical baseline and check duplicate-publication avoidance
+        run: python3 scripts/orientation-reviewed-migration.py activate
+      - name: Summarize focused test failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, xml.etree.ElementTree as ET
+          for p in (pathlib.Path(os.environ['RUNNER_TEMP'])/'orientation-source/composeApp/build/test-results').rglob('TEST-*.xml'):
+              for c in ET.parse(p).getroot().iter('testcase'):
+                  for f in list(c.findall('failure'))+list(c.findall('error')):
+                      print(c.get('classname'),c.get('name'),f.get('message'),(f.text or '')[:2000])
+          PY
+      - name: Retain source, tests, rendered UI and migration evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: orientation-0.4.22-evidence
+          path: |
+            ${{ runner.temp }}/orientation-plan.json
+            ${{ runner.temp }}/orientation-reproduced.json
+            ${{ runner.temp }}/orientation-next.json
+            ${{ runner.temp }}/orientation-risk.json
+            ${{ runner.temp }}/orientation-reports/*-xml/
+            ${{ runner.temp }}/orientation-reports/*-gradle.log
+            ${{ runner.temp }}/orientation-reports/test-evidence.json
+            ${{ runner.temp }}/orientation-source/composeApp/build/reports/ui-polish/
+          if-no-files-found: ignore
+      - name: Remove private configuration
+        if: always()
+        run: rm -f "$RUNNER_TEMP/orientation-release.jks" "$RUNNER_TEMP/orientation-source/local.properties"

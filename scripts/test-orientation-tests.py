@@ -7,7 +7,7 @@ s=importlib.util.spec_from_file_location('gate',Path(__file__).with_name('orient
 g=importlib.util.module_from_spec(s);s.loader.exec_module(g)
 class DifferentialTests(unittest.TestCase):
     def setUp(self):
-        self.good={f'com.nuvio.app.features.{area}.{name}#case':{'status':'passed','failures':[]} for area,name in [('player','PlayerOrientationTest'),('player','PlayerOrientationAndroidTest'),('updater','OrientationUpdateChannelTest')]}
+        self.good={f'com.nuvio.app.features.{area}.{name}#case':{'status':'passed','failures':[]} for area,name in [('player','PlayerOrientationTest'),('player','PlayerOrientationAndroidTest'),('updater','OrientationUpdateChannelTest'),('player','PlayerPolishLayoutTest'),('player','PortraitSubtitleViewportTest'),('player','PlayerOrientationExitTest'),('search','SearchBrowseLayoutTest')]}
         self.failure={'status':'failed','failures':[{'type':'AssertionError','message':'expected 60 actual 30','frames':[]}]}
     def test_identical_upstream_failure_allowed(self):
         c={**self.good,'unrelated#retry':self.failure}
